@@ -1,0 +1,265 @@
+<!doctype html><html lang='ja'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>2026-09-24_othello-requirements-v0.9</title><style>
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin:0; padding:28px 22px 60px; background:#0b0f1a; color:#dfe6f3;
+  font-family:'Moralerspace Neon','Noto Sans JP',-apple-system,'Hiragino Sans','Segoe UI',sans-serif;
+  font-size:15px; line-height:1.75; }
+.wrap { max-width:860px; margin:0 auto; }
+h1 { font-size:24px; color:#7df9ff; border-bottom:2px solid #1e2a45; padding-bottom:10px;
+  letter-spacing:.03em; }
+h2 { font-size:19px; color:#ffd86b; margin-top:2em; border-left:4px solid #7df9ff; padding-left:10px; }
+h3 { font-size:16px; color:#a5b4fc; margin-top:1.6em; }
+table { border-collapse:collapse; width:100%; margin:14px 0; font-size:13.5px; display:table; }
+th { background:#16203a; color:#7df9ff; text-align:left; }
+th,td { border:1px solid #26314f; padding:7px 10px; }
+tr:nth-child(even) td { background:#101828; }
+code { background:#131c30; color:#8ef0c0; padding:1px 6px; border-radius:5px;
+  font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:12.5px; }
+pre { background:#0d1526; border:1px solid #1e2a45; border-radius:10px; padding:14px;
+  overflow-x:auto; }
+pre code { background:none; padding:0; color:#b7e3ff; }
+blockquote { border-left:4px solid #ffd86b; margin:12px 0; padding:4px 14px;
+  background:#121a2c; color:#c9d4e8; }
+strong { color:#fff; }
+hr { border:none; border-top:1px solid #26314f; margin:28px 0; }
+ul,ol { padding-left:1.5em; }
+li { margin:.25em 0; }
+a { color:#7df9ff; }
+.badge { display:inline-block; background:#1b2a4a; color:#7df9ff; border-radius:8px;
+  padding:2px 10px; font-size:12px; margin-bottom:8px; }
+@media print {
+  body { background:#fff; color:#111; }
+  h1 { color:#036; } h2 { color:#750; border-left-color:#036; }
+  th { background:#e8eef7; color:#036; } th,td { border-color:#99a; }
+  tr:nth-child(even) td { background:#f4f7fb; }
+  code { background:#eef; color:#063; } pre { background:#f5f7fa; border-color:#ccd; }
+  pre code { color:#134; } blockquote { background:#f6f2e4; color:#333; }
+  .badge { background:#dde; color:#036; }
+}
+</style></head><body><div class='wrap'><span class='badge'>NEON OTHELLO 設計ドキュメント</span><h1 id="neon-othello">オセロゲーム（仮称: NEON OTHELLO）要件定義書</h1>
+<p><strong>バージョン</strong>: v0.9（ドラフト・承認待ち）
+<strong>作成日</strong>: 2026-09-24（JST）
+<strong>作成者</strong>: ルビー
+<strong>ステータス</strong>: kokuten さんへの質問（§8）への回答を得て v1.0 確定とする</p>
+<hr>
+<h2 id="1">1. 背景と目的</h2>
+<ul>
+<li>スマートフォン／タブレット向けブラウザオセロ（PWA）を新規開発する。</li>
+<li>既存の NEON TETRIS v2（GitHub Pages + Supabase + Google OAuth）のインフラ・ノウハウを再利用し、短期間で高品質に立ち上げる。</li>
+<li>よくあるオセロ機能（AI対戦・オンライン対戦・ランキング・履歴）を土台に、<strong>石のカスタマイズ（色／Googleアイコン）</strong> と <strong>レベルシステム＋賑やかしレベルアップ演出</strong> をオリジナリティとして差別化する。</li>
+</ul>
+<h2 id="2">2. ユーザーと利用環境</h2>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ターゲット端末</td>
+<td>iOS / Android のスマートフォン、タブレット</td>
+</tr>
+<tr>
+<td>実機</td>
+<td>Galaxy Fold 8（展開時 4:3 横長 / 折り畳み時縦長）、iPad、Android</td>
+</tr>
+<tr>
+<td>利用場面</td>
+<td>外出先での短いプレイが多い（QRコード配布・即開ける URL が重要）</td>
+</tr>
+<tr>
+<td>画面回転</td>
+<td>縦長⇔横長を双方向サポート。回転しても盤面・進行状態を失わない</td>
+</tr>
+<tr>
+<td>入力</td>
+<td>タッチ主体（盤面タップ＝着手）。マウスホバー用ヒントも併設</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3">3. 機能要件</h2>
+<h3 id="31-must">3.1 認証（Must）</h3>
+<ul>
+<li><strong>F-101</strong> Google OAuth によるログイン（Supabase Auth 経由、既存テトリスと同じ方式）。</li>
+<li><strong>F-102</strong> セッション自動復元（アプリ起動時に再ログイン不要）。</li>
+<li><strong>F-103</strong> 表示名は初期値＝Googleアカウントの表示名。設定画面から変更可（20字以内）。</li>
+<li><strong>F-104</strong> Googleアイコン（avatar URL）を取得し、プロフィール・対戦相手一覧・ランキング・石のテクスチャに利用可。</li>
+<li><strong>F-105</strong> 未ログインでも AI 対戦のみプレイ可能（ランキング投稿・オンライン対戦はログイン必須）。</li>
+</ul>
+<h3 id="32-must">3.2 ゲーム本体（Must）</h3>
+<ul>
+<li><strong>F-201</strong> 標準オセロルール（8×8、黒先手、初期4石配置、挟み返し、打てない升はパス、パス2回／64石で終局）。</li>
+<li><strong>F-202</strong> AI対戦：難易度を選択可（初級〜最強の複数レベル。詳細は設計書 §5）。</li>
+<li><strong>F-203</strong> オンライン対戦：待機中の対戦相手一覧から相手を選んで対戦（§3.4）。</li>
+<li><strong>F-204</strong> 同一端末2人対戦（ローカルパスアンドプレイ）。※要確認（Q-3）</li>
+<li><strong>F-205</strong> 合法手のリアルタイム表示（候補マーカー）、最新着手位置のマーキング。</li>
+<li><strong>F-206</strong> 返される石のプレビュー（着手前にホバー/長押しでどこが返るか示す）。</li>
+<li><strong>F-207</strong> 石が返るアニメーション（方向が一目で分かる回転／めくりアニメ）。※ユーザー設計要件（回転方向が視覚的に明確であることは設計要件）</li>
+<li><strong>F-208</strong> 引数カウンタ（自分の石/相手の石）、手番表示、パス発生時の明示と確認。</li>
+<li><strong>F-209</strong> 終局判定・勝敗表示（同数＝引き分け）。</li>
+<li><strong>F-210</strong> 対局中のタイムアウト処理（一手制限時間）。※要確認（Q-5）</li>
+</ul>
+<h3 id="33-must">3.3 対戦結果の保存（Must）</h3>
+<ul>
+<li><strong>F-301</strong> 全対局（AI/オンライン/ローカル）を履歴としてクラウド保存（オンライン・ログイン時）。</li>
+<li><strong>F-302</strong> 履歴画面：日時・相手・戦型（手数）・結果・石数差を表示。</li>
+<li><strong>F-303</strong> 戦績サマリー：総対局数・勝率・連勝記録（現連勝/最長連勝）。</li>
+<li><strong>F-304</strong> 対局中断時の途中保存と再開（オンライン対戦の再接続含む）。</li>
+</ul>
+<h3 id="34-must">3.4 オンライン対戦・マッチング（Must）</h3>
+<ul>
+<li><strong>F-401</strong> 「対戦相手を探す」で待機リスト画面へ。待機中のプレイヤー（名前・レベル・アイコン・戦績）を一覧表示。</li>
+<li><strong>F-402</strong> 一覧から相手を選んで「対戦を申し込む」。相手側に応答ダイアログ（受諾/拒否/自動タイムアウト）。</li>
+<li><strong>F-403</strong> 自分が待機側の場合も一覧へ載る。待機解除・自分だけを表示フィルタ（レベル帯で絞る）※要確認（Q-2）</li>
+<li><strong>F-404</strong> 対局中の離脱・通信断対処：再接続で盤面復元、一定時間復帰なき場合は不戦敗。</li>
+<li><strong>F-405</strong> 同IDへの同時申込・自分自身との対戦防止。</li>
+</ul>
+<h3 id="35-must">3.5 レベルシステム（Must）</h3>
+<ul>
+<li><strong>F-501</strong> 経験値（XP）によるユーザレベル。対戦結果・手数から自動加算（設計書 §6 に計算式）。</li>
+<li><strong>F-502</strong> レベルはゲーム画面（自分と相手のHUD）、対戦相手一覧、ランキング、履歴に表示。バッジ＋数値。</li>
+<li><strong>F-503</strong> レベル帯の称号（例: 見習い→初段→有段→名人→マスター）をランキングとプロフィールに表示。</li>
+<li><strong>F-504</strong> <strong>レベルアップ演出（賑やかし）</strong>：レベルアップ瞬間に全画面コンフェッティ＋称号獲得トースト＋効果音＋（称号変更時は一段と豪華な演出）。</li>
+<li><strong>F-505</strong> 勝敗数ではなく XP ベース（遊ぶほど育つ）＋勝敗ボーナス。※ランキングの順位軸は要確認（Q-4）</li>
+</ul>
+<h3 id="36-must">3.6 ランキング（Must）</h3>
+<ul>
+<li><strong>F-601</strong> 全世界ランキング：レベル（XP）順／勝利数順／勝率順をタブで切替。</li>
+<li><strong>F-602</strong> 上位N位＋自分の順位を必ず表示（下位でも「あなたの順位: ○位」）。</li>
+<li><strong>F-603</strong> 期間ランキング（週間・月間）を検討。※要確認（Q-4）</li>
+<li><strong>F-604</strong> 未ログインでも閲覧のみ可能。</li>
+</ul>
+<h3 id="37-must">3.7 石・盤面のカスタマイズ（Must・オリジナリティ中核）</h3>
+<ul>
+<li><strong>F-701</strong> 先手／後手の石色を自由設定：プリセットパレット（定番の黒白、ネオン、パステル…）＋カラーピッカー自由選択。</li>
+<li><strong>F-702</strong> 石テクスチャに Google アイコンを適用可（自分の石＝自分のアイコンなど）。</li>
+<li><strong>F-703</strong> オンライン対戦時のアイコン石の扱い：両者のアイコンを石に使う（相手が拒否するオプションも可）。※要確認（Q-1）</li>
+<li><strong>F-704</strong> 盤面背景・盤の色のカスタマイズ。※優先度_low（あると嬉しい）</li>
+<li><strong>F-705</strong> カスタマイズはプロフィールに紐づけてクラウド保存（別端末でも復元）。</li>
+</ul>
+<h3 id="38-must">3.8 音・演出（Must）</h3>
+<ul>
+<li><strong>F-801</strong> 着手音・返す音（返す石の数に応じた連続音）、勝利/敗北/レベルアップジングル。ミュート永続設定。</li>
+<li><strong>F-802</strong> BGM は任意（軽くループする環境音レベル）。※要確認</li>
+</ul>
+<h3 id="39-must">3.9 公開形態（Must）</h3>
+<ul>
+<li><strong>F-901</strong> GitHub Pages 静的デプロイ + PWA（オフライン起動対応・ホーム画面追加可）。</li>
+<li><strong>F-902</strong> 画面タイトル直下にアプリバージョン表示（semver、既存規約）。</li>
+<li><strong>F-903</strong> 公開 URL の QR コード生成・配布。</li>
+</ul>
+<h2 id="4">4. 非機能要件</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>要件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NF-01</td>
+<td>初回表示 ≤3s（4G相当）、ローディング中に盤面スケルトン</td>
+</tr>
+<tr>
+<td>NF-02</td>
+<td>オンライン対戦の一手同期遅延 ≤ 500ms 体感（Realtime Broadcast）</td>
+</tr>
+<tr>
+<td>NF-03</td>
+<td>AI思考はUIを止めない（Wasm/ワーカー。最長でも進捗表示）</td>
+</tr>
+<tr>
+<td>NF-04</td>
+<td>RLS によるデータ保護（他人名義の投稿・改竄防止は更新不可ポリシー）</td>
+</tr>
+<tr>
+<td>NF-05</td>
+<td>344×882（縦）〜 1000×750（Fold8展開横長）まで連続対応</td>
+</tr>
+<tr>
+<td>NF-06</td>
+<td>回転・サイズ変更時に盤面を再レイアウトし、スクロール位置と対局状態を維持</td>
+</tr>
+<tr>
+<td>NF-07</td>
+<td>低性能端末でも60fps目標のアニメ（めくりはCSS/GPU合成、Pixiは任意）</td>
+</tr>
+<tr>
+<td>NF-08</td>
+<td>Supabase Free枠内で運用（Realtime同時接続200／月200万メッセージ）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-2026-09-24">5. 調査サマリー（世の中の情報・2026-09-24）</h2>
+<ul>
+<li><strong>AI水準</strong>: 上位アプリは1手先〜8手先読み、最上位は世界最強オープンソースAI「Egaroucid」（20手以上）相当。参考: リバーシWeb（yuki-lab）。→ 本アプリは Negamax＋Alpha-Beta＋Bitboard＋評価関数（角・辺優先／打ち得・返し数）で中〜上級をカバー、最強帯は将来 Egaroucid 互換エンジン移植を検討。</li>
+<li><strong>人気アプリの共通機能</strong>（みんなのオセロ/オセロクエスト/リバーシZERO等）: 難易度多段階、オンライン対戦（ランキング連動）、連勝記録、一手タイマー、ヒント。→ 全て本要件に織り込み済み。</li>
+<li><strong>UXの定番</strong>: 合法手マーカー、返す石プレビュー、盤面を最大サイズで中央確保、HUDは縦長時は上下・横長時は左右パネル。スマホのオセロで最も不満が出るのは「盤面が小さい／指が盤を隠す」→ 盤面は <code>min(100vw, 62vh)</code> 等で自動最大化する。</li>
+<li><strong>オンライン同期方式</strong>: Supabase Realtime（Broadcast＋Presence）でターン制対戦をサーバーレス実現した実績多数（Emojitsu 等）。ターン制オセロには十分（WebSocket遅延 ~50-100ms）。</li>
+<li><strong>デザイン</strong>: 既存 NEON TETRIS 系のネオンダークUI資産（Orbitron/GSAP/howler/PWA設定）を流用すれば開発効率が最も高い。ただしオセロ専用の和モダン／木製風への転換も選択肢（Q-6）。</li>
+</ul>
+<h2 id="6-round-1">6. スコープ外（Round 1）</h2>
+<ul>
+<li>ネイティブアプリストア配信（ブラウザ/PWAのみ）</li>
+<li>LINE認証（テトリス同様 Round 2）</li>
+<li>段位認定・大会・ルームコード対戦（招待リンク対戦は Q-7 で判断）</li>
+<li>対戦チャット・絵文字リアクション（Round 2 候補）</li>
+<li>棋譜の再生・エクスポート（Round 2 候補）</li>
+<li>多言語（日本語のみで開始）</li>
+</ul>
+<h2 id="7-1">7. 成功指標（初回公開後1ヶ月）</h2>
+<ul>
+<li>AI対戦完走率 &gt; 70%、オンライン対戦成立率 &gt; 80%（申し込んだ対局が開始できる割合）</li>
+<li>レベルアップ演出の実装（スクショで賑やかしが確認できること）</li>
+<li>Fold8 実機で縦/横どちらでも親指だけで最後までプレイできること</li>
+</ul>
+<h2 id="8-kokuten-v10">8. kokuten さんへの質問（v1.0 確定の前提）</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>質問</th>
+<th>ルビー推奨</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Q-1</td>
+<td>オンラインで互いのGoogleアイコンを石にした対戦はプライバシー的にOK？（相手が自分の顔を石にされる）</td>
+<td>「アイコン石」はオプトイン。既定は色石、設定でアイコン石を許可</td>
+</tr>
+<tr>
+<td>Q-2</td>
+<td>待機リストの絞り込み（レベル帯・自分の友達等）は必要？</td>
+<td>Round 1 は「レベル帯フィルタ（近接/全員）」のみ簡素に</td>
+</tr>
+<tr>
+<td>Q-3</td>
+<td>同一端末2人対戦（ローカル対戦）を入れる？</td>
+<td>入れる（実装コスト小、家族・友達向け需要）</td>
+</tr>
+<tr>
+<td>Q-4</td>
+<td>ランキングの1等を決める軸は？（レベル=XP総量 / 勝利数 / 対人レーティング）</td>
+<td>総合=XP、タブで勝利数・対人勝率。Elo風レーティングはRound 2</td>
+</tr>
+<tr>
+<td>Q-5</td>
+<td>一手タイマーを入れる？（例: AI戦なし、オンライン30秒/手）</td>
+<td>オンラインのみ60秒/手＋残り警告。初心者に厳しい設定は出さない</td>
+</tr>
+<tr>
+<td>Q-6</td>
+<td>デザイン方向：テトリス流用のネオンダーク vs オセロ専用（和モダン・木製盤など）</td>
+<td>「NEON OTHELLO」でネオン系統一（ブランド一貫＋実装資産流用）</td>
+</tr>
+<tr>
+<td>Q-7</td>
+<td>友達と部屋番号で対戦する「招待対戦」は今回の要件に含まれる？（一覧待ち受け以外の入口）</td>
+<td>対戦相手一覧方式に集中するため Round 2。URL招待は安いが優先度低</td>
+</tr>
+</tbody>
+</table></div></body></html>

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0f1a" />
+    <title>NEON OTHELLO</title>
+  </head>
+  <body>
+    <div id="app">
+      <!-- S1 タイトル -->
+      <section id="screen-title" class="screen active">
+        <h1 class="logo">NEON<br>OTHELLO</h1>
+        <p id="app-version" class="version">v0.0.0</p>
+        <div class="menu">
+          <button id="btn-ai" class="btn">🤖 コンピューター対戦</button>
+          <button id="btn-online" class="btn">🌐 オンライン対戦</button>
+          <button id="btn-local" class="btn">👥 そのまま2人対戦</button>
+          <button id="btn-ranking" class="btn">🏆 ランキング</button>
+          <button id="btn-settings" class="btn btn-ghost">⚙️ 設定</button>
+        </div>
+        <button id="btn-login" class="btn btn-ghost login">🔑 Googleでログイン</button>
+      </section>
+
+      <!-- S2 難易度 -->
+      <section id="screen-difficulty" class="screen">
+        <button id="back-title" class="back">← タイトル</button>
+        <h2>AIの強さを選ぶ</h2>
+        <div class="levels">
+          <button class="lv-card" data-level="1"><span class="lv-name">見習い</span><span class="lv-stars">★</span></button>
+          <button class="lv-card" data-level="2"><span class="lv-name">初段</span><span class="lv-stars">★★</span></button>
+          <button class="lv-card" data-level="3"><span class="lv-name">三段</span><span class="lv-stars">★★★</span></button>
+          <button class="lv-card" data-level="4"><span class="lv-name">有段</span><span class="lv-stars">★★★★</span></button>
+          <button class="lv-card" data-level="5"><span class="lv-name">名人</span><span class="lv-stars">★★★★★</span></button>
+        </div>
+      </section>
+
+      <!-- S3 対局 -->
+      <section id="screen-game" class="screen">
+        <header id="hud-top">
+          <span class="hud-stone hud-opp"></span>
+          <span>AI</span>
+          <span class="count" id="hud-white-count">2</span>
+        </header>
+        <div id="board-stage"><canvas id="board"></canvas></div>
+        <footer id="hud-bottom">
+          <span class="hud-stone hud-me"></span>
+          <span id="hud-turn">黒の番</span>
+          <span class="count" id="hud-black-count">2</span>
+          <button id="btn-mute" class="mute-btn" aria-label="音量切り替え">🔊</button>
+        </footer>
+        <div id="pass-toast">パス！</div>
+        <button id="btn-resign" class="resign">投了</button>
+      </section>
+
+      <!-- S6 リザルト -->
+      <section id="screen-result" class="screen">
+        <div class="result-card">
+          <h2 id="result-text"></h2>
+          <p id="result-detail"></p>
+          <p id="result-xp" class="xp-line"></p>
+          <button id="btn-again" class="btn">もう一度</button>
+          <button id="btn-result-title" class="btn btn-ghost">タイトルへ</button>
+        </div>
+      </section>
+
+      <!-- S4 対戦相手一覧（オンライン） -->
+      <section id="screen-lobby" class="screen">
+        <button id="back-lobby" class="back">← タイトル</button>
+        <h2>対戦相手を探す</h2>
+        <label class="wait-toggle"><input type="checkbox" id="chk-wait"><span>他のプレイヤーに自分を表示（待機中）</span></label>
+        <ul id="lobby-list" class="rank-list lobby"></ul>
+        <div id="lobby-me" class="rank-me"></div>
+      </section>
+
+      <!-- S5 招待モーダル -->
+      <div id="invite-modal" class="modal">
+        <div class="modal-card">
+          <div class="modal-title" id="invite-text"></div>
+          <div class="modal-actions">
+            <button id="btn-accept" class="btn">受諾</button>
+            <button id="btn-decline" class="btn btn-ghost">拒否</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- S8 ランキング / S9 履歴 -->
+      <section id="screen-ranking" class="screen">
+        <button id="back-rank" class="back">← タイトル</button>
+        <h2>ランキング</h2>
+        <div class="rank-tabs">
+          <button class="rank-tab active" data-rank-tab="xp">レベル</button>
+          <button class="rank-tab" data-rank-tab="wins">勝利数</button>
+          <button class="rank-tab" data-rank-tab="winrate">勝率</button>
+        </div>
+        <ul id="rank-list" class="rank-list"></ul>
+        <div id="rank-me" class="rank-me"></div>
+        <h2 style="margin-top:14px">あなたの履歴</h2>
+        <ul id="history-list" class="hist-list"></ul>
+      </section>
+
+      <!-- S10 設定（石色） -->
+      <section id="screen-settings" class="screen">
+        <h2>石と盤のテーマ</h2>
+        <div class="levels">
+          <button class="lv-card picked" data-theme="neon"><span class="lv-name">ネオン</span><span class="swatch sw-neon"></span></button>
+          <button class="lv-card" data-theme="classic"><span class="lv-name">定番 黒白</span><span class="swatch sw-classic"></span></button>
+        </div>
+        <button id="back-title2" class="back">← タイトル</button>
+      </section>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

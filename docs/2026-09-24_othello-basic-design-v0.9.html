@@ -1,0 +1,426 @@
+<!doctype html><html lang='ja'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>2026-09-24_othello-basic-design-v0.9</title><style>
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin:0; padding:28px 22px 60px; background:#0b0f1a; color:#dfe6f3;
+  font-family:'Moralerspace Neon','Noto Sans JP',-apple-system,'Hiragino Sans','Segoe UI',sans-serif;
+  font-size:15px; line-height:1.75; }
+.wrap { max-width:860px; margin:0 auto; }
+h1 { font-size:24px; color:#7df9ff; border-bottom:2px solid #1e2a45; padding-bottom:10px;
+  letter-spacing:.03em; }
+h2 { font-size:19px; color:#ffd86b; margin-top:2em; border-left:4px solid #7df9ff; padding-left:10px; }
+h3 { font-size:16px; color:#a5b4fc; margin-top:1.6em; }
+table { border-collapse:collapse; width:100%; margin:14px 0; font-size:13.5px; display:table; }
+th { background:#16203a; color:#7df9ff; text-align:left; }
+th,td { border:1px solid #26314f; padding:7px 10px; }
+tr:nth-child(even) td { background:#101828; }
+code { background:#131c30; color:#8ef0c0; padding:1px 6px; border-radius:5px;
+  font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:12.5px; }
+pre { background:#0d1526; border:1px solid #1e2a45; border-radius:10px; padding:14px;
+  overflow-x:auto; }
+pre code { background:none; padding:0; color:#b7e3ff; }
+blockquote { border-left:4px solid #ffd86b; margin:12px 0; padding:4px 14px;
+  background:#121a2c; color:#c9d4e8; }
+strong { color:#fff; }
+hr { border:none; border-top:1px solid #26314f; margin:28px 0; }
+ul,ol { padding-left:1.5em; }
+li { margin:.25em 0; }
+a { color:#7df9ff; }
+.badge { display:inline-block; background:#1b2a4a; color:#7df9ff; border-radius:8px;
+  padding:2px 10px; font-size:12px; margin-bottom:8px; }
+@media print {
+  body { background:#fff; color:#111; }
+  h1 { color:#036; } h2 { color:#750; border-left-color:#036; }
+  th { background:#e8eef7; color:#036; } th,td { border-color:#99a; }
+  tr:nth-child(even) td { background:#f4f7fb; }
+  code { background:#eef; color:#063; } pre { background:#f5f7fa; border-color:#ccd; }
+  pre code { color:#134; } blockquote { background:#f6f2e4; color:#333; }
+  .badge { background:#dde; color:#036; }
+}
+</style></head><body><div class='wrap'><span class='badge'>NEON OTHELLO 設計ドキュメント</span><h1 id="neon-othello">オセロゲーム（仮称: NEON OTHELLO）基本設計書</h1>
+<p><strong>バージョン</strong>: v0.9（ドラフト・要件定義書 §8 の回答反映後に v1.0 確定）
+<strong>作成日</strong>: 2026-09-24（JST）
+<strong>前提</strong>: 要件定義書 <code>2026-09-24_othello-requirements-v0.9.md</code> / 既存資産 <code>/opt/share/tetris-v2</code>（Supabase + Google OAuth + Vite PWA）</p>
+<hr>
+<h2 id="1">1. 全体アーキテクチャ</h2>
+<pre><code>┌────────────────────────── ブラウザ（PWA） ─────────────────────────┐
+│ Vite + TypeScript + GSAP + howler.js（テトリス v2 と同一スタック） │
+│  ├─ core/    : ルールエンジン（Wasm: Rust、テトリス同様 wasm-pack） │
+│  │             └ 合法手生成・flip・AI（negamax）をネイティブ速度で  │
+│  ├─ engine/  : 盤面レンダラ（Canvas 2D 想定。めくり3DはCSS transform）│
+│  ├─ net/     : supabase Realtime チャネル（matchmaking + 対局同期） │
+│  ├─ supabase/: auth.ts / client.ts / ranking.ts（v2 から移植拡張）  │
+│  └─ ui/      : 各画面（セクション §4）                             │
+└────────────────────────────┬───────────────────────────────────────┘
+                             │ HTTPS / WSS（anon key・RLSで守る）
+              ┌──────────────┴───────────────┐
+              │        Supabase プロジェクト  │
+              │  Auth(Google) / Postgres /   │
+              │  Realtime(Broadcast+Presence)│
+              └──────────────────────────────┘
+静的ホスティング: GitHub Pages（elengine.github.io/neon-othello/）
+※ サーバーコード持たず。権限はすべて RLS + リアルタイムポリシーで担保。
+</code></pre>
+<ul>
+<li><strong>新規 Supabase プロジェクト</strong>をオセロ用に立てるか、テトリスと同じプロジェクトの別テーブル群にするか → <strong>推奨: 同一プロジェクト（bpsjzmnbnwtvizxjpwec）に <code>oth_*</code> テーブル追加</strong>。認証設定（Google OAuth・リダイレクトURL）の追加作業が減り、運用も一本化。GitHub Pages の OAuth リダイレクト先に新URLを追加するのみ。（要確認 Q-8）</li>
+<li>Wasm は任意フェーズで、Round 1 は TypeScript bitboard（Uint32Array×4）でも十分（60手超でも合法手生成は &lt;1ms、AIは deep 6 まで許容時間内）。テトリスの Wasm 経験は「最強AI」への強化で活かす。</li>
+</ul>
+<h2 id="2-postgres-rls">2. データモデル（Postgres / RLS）</h2>
+<h3 id="21-profiles">2.1 プロフィール拡張（既存 profiles を継承せず新テーブルで分離）</h3>
+<pre><code class="language-sql">-- oth_profiles: 認証ユーザーの公開情報＋カスタマイズ＋レベル
+create table public.oth_profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  display_name text not null default '名無し' check (char_length(display_name) &lt;= 20),
+  avatar_url   text,                              -- Google icon（null可）
+  xp           int  not null default 0,           -- 累計経験値
+  level        int  not null default 1,           -- 派生値だが表示性能のため持たせる
+  wins         int  not null default 0,
+  losses       int  not null default 0,
+  draws        int  not null default 0,
+  streak       int  not null default 0,           -- 現連勝
+  best_streak  int  not null default 0,
+  icon_stones  boolean not null default false,    -- アイコン石オプトイン（Q-1推奨）
+  stone_pref   jsonb  not null default '{}',      -- 石色・盤テーマ設定
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+
+-- oth_games: 対局の記録（1対局1レコード・投稿後は不変）
+create table public.oth_games (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.oth_profiles(id) on delete cascade,
+  opp_user_id uuid references public.oth_profiles(id),   -- AI戦は null
+  mode text not null check (mode in ('ai','online','local')),
+  ai_level int,                                           -- mode='ai' のとき
+  result text not null check (result in ('win','lose','draw','abort')),
+  black_count int not null default 0,
+  white_count int not null default 0,
+  moves int not null default 0,                           -- 総手数
+  moves_svg text,                                         -- 棋譜(座標列)。将来の再生用
+  xp_gained int not null default 0,
+  played_at timestamptz not null default now()
+);
+-- ※ 1対局で対戦者各自が1レコード投稿する（相互独立・改竄はRLSで自分行のみ）
+
+-- oth_queue: マッチング待機列（Realtime でローラークラス化）
+create table public.oth_queue (
+  user_id uuid primary key references public.oth_profiles(id) on delete cascade,
+  status text not null default 'waiting' check (status in ('waiting','invited','playing')),
+  requested_by uuid,                    -- 招待元（invited 時にセット）
+  updated_at timestamptz not null default now()
+);
+</code></pre>
+<h3 id="22-rls-v2">2.2 RLS ポリシー（テトリス v2 と同じ思想）</h3>
+<table>
+<thead>
+<tr>
+<th>テーブル</th>
+<th>SELECT</th>
+<th>INSERT</th>
+<th>UPDATE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>oth_profiles</td>
+<td>全員可（公開情報）</td>
+<td>自分のみ（トリガ自動作成）</td>
+<td>自分のみ</td>
+</tr>
+<tr>
+<td>oth_games</td>
+<td>全員可（ランキング用）</td>
+<td><code>auth.uid() = user_id</code> のみ</td>
+<td>許可しない（不変）</td>
+</tr>
+<tr>
+<td>oth_queue</td>
+<td>全員可</td>
+<td>自分の行のみ</td>
+<td><code>auth.uid() = user_id</code> のみ</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>新規ユーザー作成トリガ <code>handle_new_othello_user()</code> で <code>oth_profiles</code> を自動行作成（Google名を初期表示名に、avatar_url も metadata から）。</li>
+<li><strong>レベル・戦績の更新権限</strong>: クライアントに xp/wins の update を開けると改竄可能。対策は2案：</li>
+<li><strong>案A（推奨）</strong>: <code>oth_games</code> insert に依存する <strong>DBトリガ</strong> で xp/戦績を再計算・更新（security definer）。クライアントは対局結果を1回投稿するだけ。</li>
+<li>案B: Postgres Function (RPC) <code>submit_game(...)</code> に集約。→ 検索性は落ちるが改竄ゲートが1つ。<strong>採用: 案B（RPC）＋内部でトリガ相当の更新</strong>。将来の不正追加（同じ棋譜の再利用等）も関数内で検証可能。</li>
+<li>リアルタイム接続ポリシー: <code>realtime.messages</code> はチャンネル単位 auth 確認で十分（対局チャンネルは参加者2名の uid をbroadcast author に制限）。</li>
+</ul>
+<h3 id="23">2.3 インデックス</h3>
+<pre><code class="language-sql">create index oth_games_user_idx  on public.oth_games (user_id, played_at desc);
+create index oth_rank_xp_idx     on public.oth_profiles (xp desc, created_at asc);
+create index oth_rank_wins_idx   on public.oth_profiles (wins desc, xp desc);
+create index oth_queue_idx       on public.oth_queue (status, updated_at desc);
+</code></pre>
+<h2 id="3-supabase-realtime">3. オンライン対戦プロトコル（Supabase Realtime）</h2>
+<h3 id="31">3.1 マッチング（待機一覧 → 招待 → 受諾）</h3>
+<pre><code>[一覧画面]
+  Presence: channel &quot;oth-lobby&quot; に status=waiting で参加
+   └ メタ: { level, xp, wins, name, avatar } を Presence state へ
+ 一覧 = Presence list（DB oth_queue にも waiting 行を書き、一覧再描画・監視用二重化）
+
+[招待]
+ 招待側: DB oth_queue の相手行を status='invited', requested_by=自分 に update
+        （RLS: 相手の行を update できない問題 → 招待は oth_invites テーブル insert で表現）
+</code></pre>
+<p>※ 上記の仕様上の欠点を埋めるため <strong>oth_invites</strong> を追加する（待機者の行を他人が更新できないため）：</p>
+<pre><code class="language-sql">create table public.oth_invites (
+  id uuid primary key default gen_random_uuid(),
+  from_user uuid not null references public.oth_profiles(id) on delete cascade,
+  to_user   uuid not null references public.oth_profiles(id) on delete cascade,
+  status text not null default 'pending' check (status in ('pending','accepted','declined','expired')),
+  created_at timestamptz not null default now()
+);
+-- SELECT: 当事者のみ / INSERT: from_user のみ / UPDATE: to_user のみ（受諾/拒否は相手だけができる）
+</code></pre>
+<ul>
+<li>招待送信後、相手は Postgres Changes（<code>oth_invites</code> insert, to_user=自分）で通知を受け取る。</li>
+<li>受諾 → 双方が対局チャンネルへ。<strong>1対局1チャンネル</strong>: <code>oth-match:{game_id}</code>。</li>
+<li>タイムアウト: created_at+30s で pending なら expired 扱い（クライアント側で無視＋定期クリーン）。</li>
+</ul>
+<h3 id="32">3.2 対局同期（権威サーバーなし・相互検証型）</h3>
+<p>ターン制のため権威サーバー不要。双方が同一のルールエンジンを持ち、<strong>先手（招待側＝黒）</strong>で着手をブロードキャスト：</p>
+<pre><code>Broadcast event: { t: &quot;move&quot;, cell: 0..63, seq: n, ts }
+  - seq は 1 から単調増加（取り決め: 招待側が seq=0 で &quot;start&quot; を発行、盤面初期化）
+  - 受信側は手番一致＋合法手＋seq 順序を検証。不整合 → &quot;resync&quot;（手番が棋譜全列を応答）
+Broadcast event: { t: &quot;pass&quot; } / { t: &quot;resign&quot; }
+終局: 双方各自が RPC submit_game() を呼び記録確定（結果不一致時は black/white count 照合）
+</code></pre>
+<ul>
+<li><strong>切断/再接続</strong>: Presence の退室検知で「切断中」表示＋猶予60s。復帰時に <code>oth_games</code> 未投稿かつ対局中フラグ（<code>oth_matches</code> 進行中テーブル、§3.4）から盤面復元（手番が着手履歴を返答、または進行テーブルのスナップショットを読む）。</li>
+<li>一手タイマー（Q-5推奨: online 60s）: 両クライアントが ts 基準で等価にカウント（ズレは server ts 基準）、0で auto-pass ではなく「時間切れ＝着手不能化→2回で終局」を簡潔に：<strong>時間切れで手番放棄（パス）扱い、放棄2回で敗北</strong>。</li>
+</ul>
+<h3 id="34">3.4 進行中対局テーブル（再接続・不正防止のスナップショット）</h3>
+<pre><code class="language-sql">create table public.oth_matches (
+  id uuid primary key default gen_random_uuid(),
+  game_no bigserial,              -- 対局番号
+  black uuid not null, white uuid not null,
+  status text not null default 'active' check (status in ('active','ended','abandoned')),
+  moves text not null default '', -- 着手座標列 &quot;a1c3...&quot;（復元用・終局後に削除）
+  updated_at timestamptz not null default now()
+);
+-- SELECT当事者のみ / UPDATE当事者のみ / 終局後保持7日（定期削除）
+</code></pre>
+<h2 id="4">4. 画面設計とレスポンシブレイアウト</h2>
+<h3 id="41">4.1 画面一覧</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>画面</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S1</td>
+<td>タイトル</td>
+<td>ロゴ＋バージョン、ログイン状態、モード選択（AI戦/オンライン/ローカル/設定）、QR導線</td>
+</tr>
+<tr>
+<td>S2</td>
+<td>AI難易度選択</td>
+<td>レベルカード（見かけ石数で表現）＋自分レベル表示</td>
+</tr>
+<tr>
+<td>S3</td>
+<td>対局画面</td>
+<td>盤面＋上下HUD（手番・石数・レベルバッジ・タイマー・ミュート）</td>
+</tr>
+<tr>
+<td>S4</td>
+<td>対戦相手一覧</td>
+<td>待機プレイヤーカード（アバター・名前・Lv・勝率・アイコン石可否）、自分の待機ON切替、レベル帯フィルタ</td>
+</tr>
+<tr>
+<td>S5</td>
+<td>招待応答</td>
+<td>モーダル（受諾/拒否、30s カウントダウン）</td>
+</tr>
+<tr>
+<td>S6</td>
+<td>リザルト</td>
+<td>勝敗・石数差・獲得XP・<strong>レベルアップ演出（S7）</strong>・履歴保存確認</td>
+</tr>
+<tr>
+<td>S7</td>
+<td>レベルアップ演出</td>
+<td>全画面コンフェッティ＋称号バッジ拡大＋SE（GSAP Timeline）</td>
+</tr>
+<tr>
+<td>S8</td>
+<td>ランキング</td>
+<td>タブ: Lv(XP)/勝利数/勝率。上位100＋自分行固定。Lvバッジ・アイコン表示</td>
+</tr>
+<tr>
+<td>S9</td>
+<td>履歴/戦績</td>
+<td>対局リスト＋サマリー（勝率・連勝）、フィルタ</td>
+</tr>
+<tr>
+<td>S10</td>
+<td>設定</td>
+<td>石色カスタマイズ（プリセット＋カラーピッカー）、アイコン石オプトイン、盤テーマ、名前変更</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42">4.2 レイアウト戦略（回転対応）</h3>
+<pre><code>CSS: container queries + 論理プロパティ。盤面は正方形:
+   盤size = min( calc(100vw - 32px), calc(100dvh * 0.60) )   ※縦長
+   横長 (aspect-ratio &gt;= 1.15) → 盤を中央、HUD/情報パネルを左右カラムへ再配置
+@media (orientation: landscape) で body class 切替（touch-device 方式と同様 JS 補完可）
+- 縦長: 上HUD(相手) / 盤 / 下HUD(自分+操作) — 親指リーチ最優先
+- 横長(Fold8展開 4:3): 盤を高く最大化、左右に相手/自分パネル＋合法手カウンタ
+回転時も盤面scaleのみ変化、DOM/Wasm状態不変（テトリスのちらつき教訓:
+ overlay は visibility 制御を class 一元管理にし inline style を使わない）
+</code></pre>
+<h3 id="43">4.3 タッチインタラクション</h3>
+<ul>
+<li>1タップ＝着手（プレビューなしで即打ち可能に。誤防は「返す石プレビュー」は長押し0.25sで出る仕様にしてタップと差別化）</li>
+<li>合法手マーカー: 半透明ドット。相手の手番中は盤を触っても反応なし（手番ハイライト矢印）</li>
+<li>めくりアニメ: 石を <code>rotateY(180deg)</code>（3D transform、方向ベクトルを着手→石の角度に合わせ回転軸を垂直にする）で返る方向を視覚化。多石同時返しも1方向に波及（60ms stagger）。</li>
+</ul>
+<h3 id="44">4.4 石の描画</h3>
+<ul>
+<li>Canvas 2D + 事前レンダリング sprites（盤 8×8 描画は軽い）。</li>
+<li>色石: 塗り＋グラデ＋ネオン外周（テーマ色）。</li>
+<li><strong>アイコン石</strong>: Google avatar を <code>drawImage</code> + 円形クリップで石テクスチャ化（取得は CORS 対応の <code>lh3.googleusercontent.com</code>。取得失敗時フォールバック＝イニシャル文字）。</li>
+<li>盤面テーマ: ネオングリーン felt / 和モダン / ダーク木目（プリセット）。</li>
+</ul>
+<h2 id="5-ai">5. AI 設計</h2>
+<table>
+<thead>
+<tr>
+<th>レベル</th>
+<th>名称</th>
+<th>探索</th>
+<th>特徴</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>見習い</td>
+<td>手数1（ランダム混ぜ10%）</td>
+<td>初心者でも勝てる</td>
+</tr>
+<tr>
+<td>2</td>
+<td>初段</td>
+<td>Negamax depth 3 + 角重視</td>
+<td>石数の取り合いより角を覚える</td>
+</tr>
+<tr>
+<td>3</td>
+<td>三段</td>
+<td>depth 5、打ち得（frontier）評価</td>
+<td>序盤中盤手堅い</td>
+</tr>
+<tr>
+<td>4</td>
+<td>有段</td>
+<td>depth 7 + 終盤完全読み(残り10空→全列挙)</td>
+<td>上位帯</td>
+</tr>
+<tr>
+<td>5</td>
+<td>名人</td>
+<td>depth 9 反復深化 + 時間予算2s</td>
+<td>ほぼ負けない</td>
+</tr>
+<tr>
+<td>6</td>
+<td>最強(将来)</td>
+<td>時間予算5s／Egaroucid移植検討</td>
+<td>Round 2</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>評価関数: 角重み・辺・X-square回避・フロンティアディスク・手損（odd/even parity、Endgame parity）の重み付け。bitboard（2×uint64相当→Wasm化時は u64）で快速化。</li>
+<li>UIスレッド非ブロッキング: depth ごとの進捗で「思考中…」表示。</li>
+</ul>
+<h2 id="6-xp">6. レベル／XP 設計</h2>
+<pre><code>獲得XP = 10(着手なし最低) + 1×総手数
+       + 対戦種別ボーナス: AI戦 = 5 × AIレベル、オンライン戦 = 20、ローカル戦 = 5
+       + 勝敗: 勝利 +20 / 引き分け +5 / 敗北 0（オンラインは +15/0/-5 の対称調整も検討）
+レベル曲線: Lv n に必要な累計XP = 50 × n(n+1)/2  （Lv1→150, Lv2→450, … Lv10→2,750）
+  → 1日2〜3局で1週間に2〜3Lv上がる緩やかさ。レベル上限 Lv50（到達は称号「名人」）
+称号帯: 1-4 見習い / 5-9 級位者 / 10-19 初段 / 20-29 有段 / 30-39 高段 / 40-49 皆伝 / 50 名人
+レベルアップ検知: RPC submit_game 戻り値 { new_level, leveled_to } をクライアントが受け取り S7 演出。
+</code></pre>
+<ul>
+<li><strong>賑やかし（F-504）実装</strong>: GSAP Timeline — コンフェッティパーティクル（canvas 1レイヤ、80〜150発）、称号バッジ pop-in＋シェイク、金ネオンリング拡大、SE（howler、3音階 fanfare）、タイトル画面復帰時にもトースト残置。</li>
+</ul>
+<h2 id="7">7. セキュリティ・不正対策まとめ</h2>
+<ol>
+<li>戦績更新は RPC <code>othello_submit_game(game)</code> 内のみ（security definer）。クライアントは xp 直接 update 不可（RLS で oth_profiles の wins/losses/xp 列は update 対象外 → 列レベルポリシー or 別テーブル分離で保証）。</li>
+<li>同一棋譜の二度投稿防止: <code>oth_games</code> に <code>(user_id, opp_user_id, moves_hash)</code> 相当の重複チェックを関数内で実施。</li>
+<li>オンライン結果の相互検証: 双方の投稿石数が食い違う場合、後着のみ採用（照合不能は記録化して監視）。</li>
+<li>publishable key は公開前提。ネームスペース <code>oth_*</code> で他アプリと分離。</li>
+</ol>
+<h2 id="8">8. 実装フェーズ</h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>成果物</th>
+<th>見積</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P1</td>
+<td>リポジトリ scaffolding（Vite PWA / GSAP / howler 移植）＋DB SQL（ユーザーがSQL Editor実行）</td>
+<td>0.5d</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>ルールエンジン＋UI（S1/S2/S3/S10色石）＋AI Lv1-4（TS実装）＋めくりアニメ</td>
+<td>2d</td>
+</tr>
+<tr>
+<td>P3</td>
+<td>Supabase Auth 移植＋履歴保存＋ランキング（S8/S9）＋XP/レベル＋演出（S7）</td>
+<td>1.5d</td>
+</tr>
+<tr>
+<td>P4</td>
+<td>オンライン対戦（lobby/招待/同期/再接続・タイマー）</td>
+<td>2d</td>
+</tr>
+<tr>
+<td>P5</td>
+<td>レスポンシブ精緻化（Fold8実機）、QR配布、デプロイ</td>
+<td>1d</td>
+</tr>
+</tbody>
+</table>
+<h2 id="9">9. 追加質問（設計上の確定事項）</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>質問</th>
+<th>ルビー推奨</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Q-8</td>
+<td>Supabase は新規プロジェクト vs 既存テトリスプロジェクトに <code>oth_*</code> テーブル追加</td>
+<td>既存プロジェクト追加（OAuth設定流用・運用一元）</td>
+</tr>
+<tr>
+<td>Q-9</td>
+<td>ゲーム名（アプリ名・リポジトリ名）は「NEON OTHELLO / neon-othello」でOK？</td>
+<td>OK（ブランド一貫）。他案: REVERSI NEON 等</td>
+</tr>
+<tr>
+<td>Q-10</td>
+<td>石色の初期プリセット（黒白の定番を既定にするか、ネオンテーマを既定にするか）</td>
+<td>既定＝ネオン（他と差別化）、定番の黒白もすぐ選べる</td>
+</tr>
+</tbody>
+</table></div></body></html>

@@ -1,0 +1,406 @@
+// NEON OTHELLO — メイン（P2c: タイトル/AI対戦/石色設定まで）
+import './style.css';
+import {
+  initialBoard, applyMove, applyPass, gameStatus, stoneCount, winner,
+  legalBB, BLACK, WHITE, type Stone,
+} from './core/board';
+import { aiMove } from './core/ai';
+import { makeRenderer, NEON_DEFAULT, CLASSIC } from './render/renderer';
+import { PRESETS, prefToTheme, savePref, loadPref, loadImage } from './ui/stonePrefs';
+import gsap from 'gsap';
+import { initAuth, currentProfile, loginWithGoogle, logout, submitGame, titleFor, refreshProfile } from './supabase/auth';
+import { celebrateLevelUp } from './ui/celebrate';
+import { sfx, toggleMute } from './audio/sfx';
+import { renderRanking, renderHistory } from './ui/rankingView';
+import { initOnline, enterLobby, setWaiting, invite, isOnlinePlaying, onlineCB, setInviteHandler, endMatch, sendMove, sendPass, sendResign, saveSnapshot, type Opponent } from './net/online';
+import { encodeMoves } from './core/board';
+
+declare const __APP_VERSION__: string | undefined;
+export const APP_VERSION = (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.1.0');
+
+const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
+
+type Screen = 'title' | 'difficulty' | 'game' | 'result' | 'settings' | 'ranking' | 'lobby';
+const state = {
+  screen: 'title' as Screen,
+  board: initialBoard(),
+  aiLevel: 3,
+  humanStone: BLACK as Stone,
+  thinking: false,
+  pendingFlip: { cells: [] as number[], anim: 0, fromCell: -1 },
+  prevLevel: 1,
+  mode: 'ai' as 'ai' | 'online',
+  opp: null as Opponent | null,
+  oppTimeout: 0 as ReturnType<typeof setInterval> | 0,
+  theme: NEON_DEFAULT,
+  themeName: 'neon' as 'neon' | 'classic' | 'custom',
+};
+
+let renderer: ReturnType<typeof makeRenderer>;
+
+function show(s: Screen): void {
+  state.screen = s;
+  for (const id of ['screen-title', 'screen-difficulty', 'screen-game', 'screen-result', 'screen-settings', 'screen-ranking', 'screen-lobby']) {
+    $(id).classList.toggle('active', id === 'screen-' + s);
+  }
+  if (s === 'game') layoutBoard();
+  if (s === 'ranking') { void renderRanking(); void renderHistory(); }
+}
+
+function layoutBoard(): void {
+  const stage = $('board-stage');
+  const rect = stage.getBoundingClientRect();
+  const size = Math.min(rect.width, rect.height);
+  renderer.resize(size);
+  drawAll({ legal: true });
+}
+
+function drawAll(opts: { legal?: boolean } = {}): void {
+  renderer.draw(state.board, {
+    legal: opts.legal && gameStatus(state.board) === 'playing' && !state.thinking,
+    last: true,
+    flippedCells: state.pendingFlip.cells,
+    flipAnim: state.pendingFlip.cells.length ? state.pendingFlip.anim : undefined,
+  });
+  const { black, white } = stoneCount(state.board);
+  $('hud-black-count').textContent = String(black);
+  $('hud-white-count').textContent = String(white);
+  $('hud-turn').textContent = gameStatus(state.board) === 'over' ? '対局終了'
+    : (state.board.turn === BLACK ? '黒' : '白') + 'の番'
+    + (state.thinking ? '（AI思考中…）' : '');
+}
+
+function onBoardTap(ev: PointerEvent): void {
+  if (state.screen !== 'game' || state.thinking || gameStatus(state.board) === 'over') return;
+  if (state.board.turn !== state.humanStone) return;
+  const canvas = $('board') as unknown as HTMLCanvasElement;
+  const cell = renderer.cellAt(ev.clientX, ev.clientY, canvas.getBoundingClientRect());
+  if (cell === null) return;
+  const r = applyMove(state.board, cell);
+  if (!r.ok) return;
+  playSound('place');
+  lastMoves.push(cell);
+  state.pendingFlip = { cells: r.flipped, anim: 1, fromCell: cell };
+  state.board = r.board;
+  if (state.mode === 'online') { sendMove(cell); void saveSnapshot(encodeMoves(lastMoves)); }
+  animateFlip(() => {
+    state.pendingFlip = { cells: [], anim: 0, fromCell: -1 };
+    checkTurn();
+  });
+}
+
+function animateFlip(done: () => void): void {
+  const t = { v: 1 };
+gsap.to(t, {
+    v: 0, duration: 0.42, ease: 'power1.inOut',
+    onUpdate: () => { state.pendingFlip.anim = t.v; drawAll(); },
+    onComplete: () => { if (playSound('flip', state.pendingFlip.cells.length), true) done(); },
+  });
+}
+
+function checkTurn(): void {
+  drawAll({ legal: true });
+  if (gameStatus(state.board) === 'over') { finishGame(); return; }
+  if (legalBB(state.board.bb, state.board.turn) === 0n) {
+    // パス発生
+    $('pass-toast').classList.add('show');
+    playSound('pass');
+    setTimeout(() => $('pass-toast').classList.remove('show'), 1400);
+    if (state.mode === 'online' && state.board.turn === state.humanStone) sendPass();
+    state.board = applyPass(state.board);
+    if (gameStatus(state.board) === 'over') { finishGame(); return; }
+  }
+  if (state.mode === 'online') { startTurnTimer(); return; } // AI禁止・相手待ちタイマー
+  if (state.board.turn !== state.humanStone) scheduleAI();
+}
+
+function startTurnTimer(): void {
+  stopTurnTimer();
+  if (state.board.turn === state.humanStone) return;
+  const t0 = Date.now();
+  const hud = $('hud-turn');
+  state.oppTimeout = setInterval(() => {
+    const left = Math.max(0, 60 - Math.floor((Date.now() - t0) / 1000));
+    hud.textContent = `相手の番（残り${left}秒）`;
+    if (left === 10) playSound('warn');
+    if (left <= 0) {
+      // 時間切れ＝相手パス扱い（設計書 §3.2）
+      onlineCB.onRemotePass?.();
+    }
+  }, 1000);
+}
+function stopTurnTimer(): void { if (state.oppTimeout) clearInterval(state.oppTimeout); state.oppTimeout = 0; }
+
+function scheduleAI(): void {
+  state.thinking = true;
+  drawAll();
+  setTimeout(() => {
+    const m = aiMove(state.board, state.aiLevel);
+    if (m.pass) {
+      state.board = applyPass(state.board);
+      state.thinking = false;
+      checkTurn();
+      return;
+    }
+    const r = applyMove(state.board, m.cell);
+    state.thinking = false;
+    if (!r.ok) { state.board = applyPass(state.board); checkTurn(); return; }
+    playSound('place');
+    lastMoves.push(m.cell);
+    state.pendingFlip = { cells: r.flipped, anim: 1, fromCell: m.cell };
+    state.board = r.board;
+    animateFlip(() => {
+      state.pendingFlip = { cells: [], anim: 0, fromCell: -1 };
+      checkTurn();
+    });
+  }, 120);
+}
+
+let lastMoves: number[] = [];
+
+async function finishGame(): Promise<void> {
+  const w = winner(state.board);
+  const { black, white } = stoneCount(state.board);
+  const text = w === 'draw' ? '引き分け' : (w === state.humanStone ? 'あなたの勝ち！' : 'AIの勝ち');
+  $('result-text').textContent = text;
+  $('result-detail').textContent = `黒 ${black} — 白 ${white}（全${state.board.moveCount}手）`;
+  show('result');
+  playSound(w === 'draw' ? 'draw' : (w === state.humanStone ? 'win' : 'lose'));
+  // クラウド投稿（ログイン時）→ 獲得XP/レベルアップ演出
+  const me = currentProfile();
+  const badge = $('result-xp');
+  stopTurnTimer();
+  if (state.mode === 'online') {
+    await endMatch();
+    document.body.classList.remove('online-game');
+    if (!me) { show('title'); return; }
+  }
+  if (me) {
+    badge.textContent = '戦績を保存中…';
+    const r = await submitGame({
+      mode: state.mode, result: w === 'draw' ? 'draw' : (w === state.humanStone ? 'win' : 'lose'),
+      ai_level: state.mode === 'ai' ? state.aiLevel : undefined, black_count: black, white_count: white,
+      moves: state.board.moveCount, moves_svg: encodeMoves(lastMoves),
+      opp_user: state.mode === 'online' ? (state.opp?.id ?? null) : null,
+    });
+    if (r) {
+      badge.textContent = `＋${r.xp_gained} XP（Lv${r.new_level} ${titleFor(r.new_level)}）`;
+      if (r.leveled_to) setTimeout(() => celebrateLevelUp(r.leveled_to!, state.prevLevel, r.xp), 650);
+    } else badge.textContent = '（保存失敗: 記録は端末内のみ）';
+    state.prevLevel = me.level;
+  } else badge.textContent = 'AI対戦のみ: ログインで戦績とレベルが保存されます';
+}
+
+// ---- SE（sfx.ts・ミュート永続設定追従） ----
+function playSound(kind: string, n = 1): void {
+  if (kind === 'place') sfx.place();
+  else if (kind === 'flip') sfx.flip(n);
+  else if (kind === 'win') sfx.win();
+  else if (kind === 'lose') sfx.lose();
+  else if (kind === 'draw') sfx.draw();
+  else if (kind === 'warn') sfx.warn();
+  else if (kind === 'invite') sfx.invite();
+  else if (kind === 'pass') sfx.pass();
+}
+
+// ---- 石色テーマ ----
+function applyTheme(): void {
+  state.theme = state.themeName === 'classic' ? CLASSIC : NEON_DEFAULT;
+  document.documentElement.style.setProperty('--stone-black', state.theme.black);
+  document.documentElement.style.setProperty('--stone-white', state.theme.white);
+  renderer = makeRenderer($('board') as unknown as HTMLCanvasElement, state.theme);
+}
+
+async function setPref(black: string, white: string, glow: string, boardBg: string, iconOn: boolean): Promise<void> {
+  const th = prefToTheme({ black, white, glow, boardBg });
+  if (iconOn && currentProfile()?.avatar_url) {
+    const im = await loadImage(currentProfile()!.avatar_url!);
+    // 自分の石（黒側=先手想定）にアイコン。相手のアイコンはオンライン時のみ他モジュールで設定
+    th.blackIcon = im;
+  }
+  state.theme = th; state.themeName = 'custom';
+  document.documentElement.style.setProperty('--stone-black', black);
+  document.documentElement.style.setProperty('--stone-white', white);
+  renderer = makeRenderer($('board') as unknown as HTMLCanvasElement, state.theme);
+  if (state.screen === 'game') layoutBoard(); else drawAll();
+  await savePref({ black, white, glow, boardBg }, iconOn);
+}
+
+async function restorePref(): Promise<void> {
+  const lp = await loadPref(); if (!lp) return;
+  await setPref(lp.pref.black, lp.pref.white, lp.pref.glow, lp.pref.boardBg, lp.iconStones);
+  document.querySelectorAll('[data-preset]').forEach((x) => x.classList.remove('picked'));
+}
+
+// ---- 起動 ----
+export function boot(): void {
+  $('app-version').textContent = 'v' + APP_VERSION;
+  renderer = makeRenderer($('board') as unknown as HTMLCanvasElement, state.theme);
+
+  $('btn-ai').addEventListener('click', () => show('difficulty'));
+  $('btn-online').addEventListener('click', () => {
+    if (!currentProfile()) { toast('オンライン対戦はGoogleログインが必要です'); loginWithGoogle(); return; }
+    void enterLobby(renderLobby); show('lobby'); renderLobby([]); // 自分宛招待の拾得もlobby内で監視
+    const w = ($('chk-wait') as unknown as HTMLInputElement);
+    w.checked = false;
+  });
+  $('back-lobby').addEventListener('click', () => { void setWaiting(false); show('title'); });
+  ($('chk-wait') as unknown as HTMLInputElement).addEventListener('change', async (e) => {
+    await setWaiting((e.target as HTMLInputElement).checked); renderLobby(lastLobby);
+  });
+  setInviteHandler((opp, accept, decline) => {
+    $('invite-text').textContent = `${opp.display_name}（Lv${opp.level}）から対戦招待`;
+    playSound('invite');
+    $('invite-modal').classList.add('show');
+    $('btn-accept').onclick = () => { $('invite-modal').classList.remove('show'); accept(); };
+    $('btn-decline').onclick = () => { $('invite-modal').classList.remove('show'); decline(); };
+  });
+  onlineCB.onMatchStart = (iAmBlack, opp) => {
+    state.mode = 'online'; state.opp = opp; state.humanStone = iAmBlack ? BLACK : WHITE;
+    document.body.classList.add('online-game');
+    state.board = initialBoard(); lastMoves = [];
+    show('game'); layoutBoard();
+    $('hud-top').querySelector('span:nth-child(2)')!.textContent = `${opp.display_name} Lv${opp.level}`;
+    toast(`対戦開始！ ${opp.display_name}（Lv${opp.level}） vs あなた${iAmBlack ? '（黒=先手）' : '（白=後手）'}`);
+  };
+  onlineCB.onRemoteMove = (cell) => {
+    if (state.screen !== 'game' || state.mode !== 'online') return;
+    stopTurnTimer();
+    const r = applyMove(state.board, cell);
+    if (!r.ok) return;
+    lastMoves.push(cell);
+    playSound('place');
+    state.pendingFlip = { cells: r.flipped, anim: 1, fromCell: cell };
+    state.board = r.board;
+    animateFlip(() => { state.pendingFlip = { cells: [], anim: 0, fromCell: -1 }; void saveSnapshot(encodeMoves(lastMoves)); checkTurn(); });
+  };
+  onlineCB.onRemotePass = () => {
+    if (state.screen !== 'game' || state.mode !== 'online') return;
+    stopTurnTimer(); toast('相手は打てません（パス）');
+    state.board = applyPass(state.board);
+    if (gameStatus(state.board) === 'over') { finishGame(); return; }
+    checkTurn();
+  };
+  onlineCB.onRemoteResign = async () => { stopTurnTimer(); toast('相手が投了しました'); await endMatch(); finishGame(); };
+  onlineCB.onOpponentLeft = async () => {
+    if (!isOnlinePlaying()) return;
+    toast('相手が切断されました（60秒以内に復帰ないと不戦勝）');
+    let sec = 0;
+    const iv = setInterval(async () => {
+      sec += 1;
+      if (sec >= 60) { clearInterval(iv); if (isOnlinePlaying()) { await endMatch(); finishGame(); } }
+    }, 1000);
+  };
+  $('btn-local').addEventListener('click', () => toast('ローカル2人対戦はP3で実装予定'));
+  $('btn-settings').addEventListener('click', () => show('settings'));
+  $('btn-ranking').addEventListener('click', () => show('ranking'));
+  $('btn-login').addEventListener('click', () => currentProfile() ? void logout().then(refreshChrome) : loginWithGoogle());
+  $('back-title').addEventListener('click', () => show('title'));
+  $('back-title2').addEventListener('click', () => show('title'));
+
+  for (const lv of [1, 2, 3, 4, 5]) {
+    const card = document.querySelector(`[data-level="${lv}"]`);
+    card?.addEventListener('click', () => {
+      state.aiLevel = lv; state.humanStone = BLACK; state.mode = 'ai';
+      document.body.classList.remove('online-game');
+      state.board = initialBoard(); lastMoves = [];
+      show('game'); layoutBoard(); drawAll({ legal: true });
+    });
+  }
+
+  $('board').addEventListener('pointerdown', onBoardTap as EventListener);
+  $('btn-resign').addEventListener('click', async () => {
+    if (state.mode !== 'online' || state.screen !== 'game') return;
+    sendResign(); stopTurnTimer(); await endMatch();
+    $('result-text').textContent = '投了しました';
+    $('result-detail').textContent = '';
+    show('result');
+  });
+  $('btn-again').addEventListener('click', () => { state.board = initialBoard(); lastMoves = []; show('game'); layoutBoard(); drawAll({ legal: true }); });
+  $('btn-result-title').addEventListener('click', () => show('title'));
+  ($('btn-mute') as HTMLElement).addEventListener('click', (e) => {
+    const m = toggleMute();
+    (e.currentTarget as HTMLElement).textContent = m ? '🔇' : '🔊';
+  });
+  $('back-rank').addEventListener('click', () => show('title'));
+  document.querySelectorAll('[data-rank-tab]').forEach((el) => el.addEventListener('click', () => {
+    document.querySelectorAll('[data-rank-tab]').forEach((x) => x.classList.toggle('active', x === el));
+    void renderRanking();
+  }));
+
+  // 設定画面: プリセットカード生成
+  const grid = $('preset-grid');
+  PRESETS.forEach((ps) => {
+    const b = document.createElement('button');
+    b.className = 'lv-card'; b.dataset.preset = ps.name;
+    b.innerHTML = `<span class="lv-name">${ps.name}</span><span class="swatch" style="background:linear-gradient(90deg,${ps.pref.black},${ps.pref.white})"></span>`;
+    b.addEventListener('click', () => {
+      setPref(ps.pref.black, ps.pref.white, ps.pref.glow, ps.pref.boardBg, ($('chk-icon') as unknown as HTMLInputElement).checked);
+      grid.querySelectorAll('[data-preset]').forEach((x) => x.classList.toggle('picked', x === b));
+    });
+    grid.appendChild(b);
+  });
+  const cpB = $('pick-black') as unknown as HTMLInputElement, cpW = $('pick-white') as unknown as HTMLInputElement;
+  const onPick = () => setPref(cpB.value, cpW.value, state.theme.glow, state.theme.boardBg, ($('chk-icon') as unknown as HTMLInputElement).checked);
+  cpB.addEventListener('input', onPick); cpW.addEventListener('input', onPick);
+  $('chk-icon').addEventListener('click', () => {
+    const c = ($('chk-icon') as unknown as HTMLInputElement); c.checked = !c.checked;
+    c.classList.toggle('on', c.checked);
+    setPref(cpB.value, cpW.value, state.theme.glow, state.theme.boardBg, c.checked);
+  });
+
+  window.addEventListener('resize', () => { if (state.screen === 'game') layoutBoard(); });
+  screen.orientation?.addEventListener?.('change', () => setTimeout(() => { if (state.screen === 'game') layoutBoard(); }, 120));
+
+  applyTheme(); show('title');
+  void initAuth(async (s) => {
+    if (s) await refreshProfile();
+    refreshChrome();
+    if (s) { void restorePref(); void initOnline(); }
+  });
+}
+
+function refreshChrome(): void {
+  const me = currentProfile();
+  const btn = $('btn-login');
+  if (me) {
+    btn.textContent = `👤 ${me.display_name}（Lv${me.level} ${titleFor(me.level)}） / ログアウト`;
+    state.prevLevel = me.level;
+  } else btn.textContent = '🔑 Googleでログイン';
+}
+
+let lastLobby: Opponent[] = [];
+function renderLobby(list: Opponent[]): void {
+  lastLobby = list;
+  const ul = $('lobby-list');
+  ul.innerHTML = '';
+  if (list.length === 0) {
+    ul.innerHTML = '<li class="rank-loading">待機中のプレイヤーはまだいません。「待機中」をONにするとあなたも一覧に出ます</li>';
+    return;
+  }
+  for (const o of list) {
+    const li = document.createElement('li');
+    li.className = 'rank-item lobby-row';
+    li.innerHTML = `<img class="rank-ava" src="${o.avatar_url ?? ''}" onerror="this.style.visibility='hidden'">
+      <span class="rank-name">${o.display_name}</span><span class="rank-lv">Lv${o.level}</span>
+      <span class="rank-num">${o.wins}勝${o.losses}敗</span>
+      <button class="btn btn-ghost challenge">挑戦</button>`;
+    li.querySelector('.challenge')!.addEventListener('click', async (e) => {
+      (e.target as HTMLElement).textContent = '…';
+      const st = await invite(o);
+      (e.target as HTMLElement).textContent = st === 'sent' ? '招待送信中' : 'もう待機していません';
+    });
+    ul.appendChild(li);
+  }
+}
+
+function toast(msg: string): void {
+  const t = $('pass-toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => { t.textContent = 'パス！'; t.classList.remove('show'); }, 1600);
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+}
+export { show as _show };
