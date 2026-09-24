@@ -1,14 +1,25 @@
 // ランキング/履歴/プロフィール画面（設計書 S8/S9）
 import { fetchRanking, myRank, fetchHistory, currentProfile, titleFor, type RankRow } from '../supabase/auth';
+import { supabaseConfigured } from '../supabase/client';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
 export async function renderRanking(): Promise<void> {
   const list = $('rank-list');
-  const tab = (document.querySelector('[data-rank-tab.active]') as HTMLElement)?.dataset.rankTab ?? 'xp';
+  const tab = (document.querySelector('[data-rank-tab].active') as HTMLElement)?.dataset.rankTab ?? 'xp';
+  if (!supabaseConfigured()) {
+    list.innerHTML = '<li class="rank-loading">ランキングはまだ空です（サーバー未接続の可能性もあります）</li>';
+    $('rank-me').textContent = '';
+    return;
+  }
   list.innerHTML = '<li class="rank-loading">読み込み中…</li>';
   const rows = await fetchRanking(tab as 'xp' | 'wins' | 'winrate');
   const me = currentProfile();
+  if (rows.length === 0 && !me) {
+    list.innerHTML = '<li class="rank-loading">ランキングはまだ空です（サーバー未接続の可能性もあります）</li>';
+    $('rank-me').textContent = '';
+    return;
+  }
   list.innerHTML = '';
   rows.forEach((r, i) => list.appendChild(rankRow(r, i + 1, me?.id === r.id)));
   if (me && !rows.some((r) => r.id === me.id)) {

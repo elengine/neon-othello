@@ -7,6 +7,8 @@ function getEnv(name: string): string {
   try { return (import.meta as unknown as { env: Record<string, string> }).env[name] ?? ''; } catch { return ''; }
 }
 
+export function supabaseConfigured(): boolean { return !!(getEnv('VITE_SUPABASE_URL') && getEnv('VITE_SUPABASE_ANON_KEY')); }
+
 export function supabase(): SupabaseClient | null {
   if (client) return client;
   const url = getEnv('VITE_SUPABASE_URL');

@@ -9,6 +9,7 @@ import { makeRenderer, NEON_DEFAULT, CLASSIC } from './render/renderer';
 import { PRESETS, prefToTheme, savePref, loadPref, loadImage } from './ui/stonePrefs';
 import gsap from 'gsap';
 import { initAuth, currentProfile, loginWithGoogle, logout, submitGame, titleFor, refreshProfile } from './supabase/auth';
+import { supabaseConfigured } from './supabase/client';
 import { celebrateLevelUp } from './ui/celebrate';
 import { sfx, toggleMute } from './audio/sfx';
 import { renderRanking, renderHistory } from './ui/rankingView';
@@ -228,7 +229,11 @@ async function setPref(black: string, white: string, glow: string, boardBg: stri
 
 async function restorePref(): Promise<void> {
   const lp = await loadPref(); if (!lp) return;
+  ($('chk-icon') as unknown as HTMLInputElement).checked = lp.iconStones;
   await setPref(lp.pref.black, lp.pref.white, lp.pref.glow, lp.pref.boardBg, lp.iconStones);
+  (document.getElementById('pick-black') as HTMLInputElement).value = lp.pref.black;
+  (document.getElementById('pick-white') as HTMLInputElement).value = lp.pref.white;
+  const ps = document.querySelector(`[data-preset]`) as HTMLElement | null; void ps;
   document.querySelectorAll('[data-preset]').forEach((x) => x.classList.remove('picked'));
 }
 
@@ -239,6 +244,7 @@ export function boot(): void {
 
   $('btn-ai').addEventListener('click', () => show('difficulty'));
   $('btn-online').addEventListener('click', () => {
+    if (!supabaseConfigured()) { toast('サーバー未接続: 先にDB SQLをSupabaseで実行してください'); return; }
     if (!currentProfile()) { toast('オンライン対戦はGoogleログインが必要です'); loginWithGoogle(); return; }
     void enterLobby(renderLobby); show('lobby'); renderLobby([]); // 自分宛招待の拾得もlobby内で監視
     const w = ($('chk-wait') as unknown as HTMLInputElement);
@@ -343,9 +349,8 @@ export function boot(): void {
   const cpB = $('pick-black') as unknown as HTMLInputElement, cpW = $('pick-white') as unknown as HTMLInputElement;
   const onPick = () => setPref(cpB.value, cpW.value, state.theme.glow, state.theme.boardBg, ($('chk-icon') as unknown as HTMLInputElement).checked);
   cpB.addEventListener('input', onPick); cpW.addEventListener('input', onPick);
-  $('chk-icon').addEventListener('click', () => {
-    const c = ($('chk-icon') as unknown as HTMLInputElement); c.checked = !c.checked;
-    c.classList.toggle('on', c.checked);
+  $('chk-icon').addEventListener('change', (e) => {
+    const c = (e.target as HTMLInputElement);
     setPref(cpB.value, cpW.value, state.theme.glow, state.theme.boardBg, c.checked);
   });
 
