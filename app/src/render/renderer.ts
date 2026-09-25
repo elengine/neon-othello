@@ -10,10 +10,6 @@ export interface StoneTheme {
   grid: string;
   blackIcon?: HTMLImageElement | null;  // アイコン石（オプトイン）
   whiteIcon?: HTMLImageElement | null;
-  markerRing?: number;   // 合法手マーカー外枠の不透明度 (0〜1, 既定 0.9)
-  markerDot?: number;    // 合法手マーカー中心ドットの不透明度 (0〜1, 既定 1.0)
-  markerRingColor?: 'theme' | 'white';  // 外枠の色種
-  markerDotColor?: 'theme' | 'white';   // 中心ドットの色種
 }
 
 export const NEON_DEFAULT: StoneTheme = {
@@ -106,10 +102,10 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
     if (o.legal) {
       const lm = legalBB(board.bb, board.turn);
       const turnColor = board.turn === BLACK ? theme.black : theme.white;
-      const ringColor = (theme.markerRingColor === 'white') ? '#ffffff' : turnColor;
-      const dotColor = (theme.markerDotColor === 'theme') ? turnColor : '#ffffff';
-      const ringA = theme.markerRing ?? 0.9;
-      const dotA = theme.markerDot ?? 1.0;
+      const ringColor = '#ffffff';            // 確定仕様: 外枠円は白
+      const dotColor = turnColor;             // 確定仕様: 中心はテーマ色（手番側）
+      const ringA = 0.15;                     // 確定仕様: 外枠 15%
+      const dotA = 0.6;                       // 確定仕様: 中心 60%
       let m = lm;
       while (m !== 0n) {
         const i = leastBitIndex(m); m &= m - 1n;
