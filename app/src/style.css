@@ -1,13 +1,13 @@
 /* NEON OTHELLO — ダークネオンUI・回転レスポンシブ（設計書 §4.2）
-   フォント: Moralerspace Neon（アプリ本体はvite側で同梱、開発中はシステム経由） */
+   フォント: M PLUS 2（Google Fonts・OFL。2026-09-25 採用。woff2は常用+游標漢字サブセットをvite同梱） */
 @font-face {
-  font-family: 'Moralerspace Neon';
-  src: url('/fonts/MoralerspaceNeon-Regular.woff2') format('woff2');
+  font-family: 'M PLUS 2';
+  src: url('/fonts/MPLUS2-400.woff2') format('woff2');
   font-weight: 400; font-display: swap;
 }
 @font-face {
-  font-family: 'Moralerspace Neon';
-  src: url('/fonts/MoralerspaceNeon-Bold.woff2') format('woff2');
+  font-family: 'M PLUS 2';
+  src: url('/fonts/MPLUS2-700.woff2') format('woff2');
   font-weight: 700; font-display: swap;
 }
 :root {
@@ -20,7 +20,7 @@
 html, body { margin: 0; height: 100%; }
 body {
   background: var(--bg); color: var(--ink); overflow: hidden;
-  font-family: 'Moralerspace Neon', 'Noto Sans JP', -apple-system, 'Hiragino Sans', sans-serif;
+  font-family: 'M PLUS 2', 'Noto Sans JP', -apple-system, 'Hiragino Sans', sans-serif;
   touch-action: manipulation; user-select: none; -webkit-user-select: none;
 }
 #app { height: 100dvh; }
