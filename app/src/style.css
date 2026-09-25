@@ -253,14 +253,11 @@ body.online-game .resign { display: block; }
 }
 .result-card { gap: 18px; padding: 42px 48px; }
 
-/* スタート: ログイン/ログアウトは枠なし・バージョン直下位置 */
+/* スタート: ログイン/ログアウトは枠なし */
 .login { margin-top: 8px; padding: 8px 4px; background: none !important; border: none !important;
   box-shadow: none !important; animation: none !important; font-size: 15px; color: #7f97c4;
-  align-self: center; order: -1; }
+  align-self: center; }
 #screen-title { flex-direction: column; }
-.version { order: 10; margin-top: 6px; }
-#screen-title .menu-sub { order: 2; }
-#screen-title .menu:not(.menu-sub) { order: 1; }
 
 /* ===== スタート: ランキング/設定は枠なし（テキスト風）・上との間隔を広げる ===== */
 .menu-sub { margin-top: 30px; gap: 26px; flex-direction: row; justify-content: center; width: min(360px, 88vw); }
@@ -268,3 +265,36 @@ body.online-game .resign { display: block; }
   font-size: 17px; color: #9db8e4; text-decoration: underline; text-underline-offset: 5px;
   text-decoration-color: #35507f; }
 .btn-ghost2:active { color: var(--accent); }
+
+/* ===== v0.7.0 ===== */
+/* スタート: order順確定（タイトル→バージョン→認証→プレイ→サブ） */
+#screen-title .logo { order: 1; }
+#screen-title .version { order: 2; margin: 4px 0 2px; }
+#screen-title .login { order: 3; }
+#screen-title .menu:not(.menu-sub) { order: 4; margin-top: 26px; }
+#screen-title .menu-sub { order: 5; margin-top: 24px; }
+
+/* 設定: テーマカードの上下padding縮小+可変列数(auto-fit) */
+#preset-grid { grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 10px; }
+#preset-grid .lv-card { padding: 10px 6px; gap: 6px; }
+
+/* トグル: ポッチ（ノブ）が枠内に収まるよう比率指定で確定 */
+.wait-toggle input[type="checkbox"] { width: 56px; height: 30px; border-radius: 999px; }
+.wait-toggle input[type="checkbox"]::after { width: 22px; height: 22px; top: 3px; left: 3px; }
+.wait-toggle input[type="checkbox"]:checked::after { left: 31px; }   /* 56-22-3 の内側に収める */
+
+/* ===== ゲーム: 手番強調・思考オーバーレイ・手数非表示 ===== */
+.hud-stone { transition: box-shadow .18s, transform .18s; }
+.hud-stone.turn-on { box-shadow: 0 0 14px #7df9ff, 0 0 32px #7df9ff88; transform: scale(1.22); }
+
+#think-overlay { position: absolute; inset: 0; display: none; place-items: center;
+  color: #bfefff; font-size: 17px; letter-spacing: .08em; pointer-events: none;
+  background: rgba(7, 12, 28, .35); backdrop-filter: blur(1.5px); }
+#think-overlay.show { display: grid; }
+#board-stage { position: relative; }
+
+/* 手数: 保存速度欄は空欄非表示（AI対戦・終了時以外は隠す） */
+.count-hid { visibility: hidden; width: 2ch; }
+
+/* 結果詳細: 大型化 */
+#result-detail { font-size: 19px; color: #cfe0ff; font-weight: 700; }

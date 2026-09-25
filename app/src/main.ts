@@ -96,9 +96,13 @@ function drawAll(opts: { legal?: boolean } = {}): void {
   const over = gameStatus(state.board) === 'over';
   $('hud-black-count').textContent = over ? String(black) : '　';
   $('hud-white-count').textContent = over ? String(white) : '　';
-  $('hud-turn').textContent = gameStatus(state.board) === 'over' ? '対局終了'
-    : (state.board.turn === BLACK ? '黒' : '白') + 'の番'
-    + (state.thinking ? '（AI思考中…）' : '');
+  // 手番は騎手アイコンの光強調で示す（文言はなし）。
+  // AI思考中は盤面上に透過オーバーレイで表示（盤外HUDには出さない）
+  $('hud-turn').textContent = gameStatus(state.board) === 'over' ? '対局終了' : '';
+  const meOn = state.board.turn === state.humanStone;
+  document.querySelector('.hud-me')?.classList.toggle('turn-on', meOn && !state.thinking && gameStatus(state.board) !== 'over');
+  document.querySelector('.hud-opp')?.classList.toggle('turn-on', !meOn && !state.thinking && gameStatus(state.board) !== 'over');
+  $('think-overlay').classList.toggle('show', state.thinking);
 }
 
 function onBoardTap(ev: PointerEvent): void {
@@ -214,7 +218,13 @@ async function finishGame(): Promise<void> {
     : localMode ? (w === BLACK ? '黒の勝ち！' : '白の勝ち！')
     : (w === state.humanStone ? 'あなたの勝ち！' : 'AIの勝ち');
   $('result-text').textContent = text;
-  $('result-detail').textContent = `黒 ${black} — 白 ${white}（全${state.board.moveCount}手）`;
+  const meIsBlack = state.humanStone === BLACK;
+  const localModeNow = state.mode === 'ai' && state.aiLevel === 0;
+  const myCnt = meIsBlack ? black : white;
+  const oppCnt = meIsBlack ? white : black;
+  $('result-detail').textContent = localModeNow
+    ? `黒 ${black} — 白 ${white}（全${state.board.moveCount}手）`
+    : `あなた ${myCnt} — 相手 ${oppCnt}（全${state.board.moveCount}手）`;
   show('result');
   playSound(w === 'draw' ? 'draw' : (w === state.humanStone ? 'win' : 'lose'));
   // クラウド投稿（ログイン時）→ 獲得XP/レベルアップ演出
@@ -228,16 +238,23 @@ async function finishGame(): Promise<void> {
   }
   if (me) {
     badge.textContent = '戦績を保存中…';
-    const r = await submitGame({
-      mode: state.mode, result: w === 'draw' ? 'draw' : (w === state.humanStone ? 'win' : 'lose'),
-      ai_level: state.mode === 'ai' ? state.aiLevel : undefined, black_count: black, white_count: white,
-      moves: state.board.moveCount, moves_svg: encodeMoves(lastMoves),
-      opp_user: state.mode === 'online' ? (state.opp?.id ?? null) : null,
-    });
-    if (r) {
-      badge.textContent = `＋${r.xp_gained} XP（Lv${r.new_level} ${titleFor(r.new_level)}）`;
-      if (r.leveled_to) setTimeout(() => celebrateLevelUp(r.leveled_to!, state.prevLevel, r.xp), 650);
-    } else badge.textContent = '（保存失敗: 記録は端末内のみ）';
+    try {
+      const r = await submitGame({
+        mode: state.mode, result: w === 'draw' ? 'draw' : (w === state.humanStone ? 'win' : 'lose'),
+        ai_level: state.mode === 'ai' ? state.aiLevel : undefined, black_count: black, white_count: white,
+        moves: state.board.moveCount, moves_svg: encodeMoves(lastMoves),
+        opp_user: state.mode === 'online' ? (state.opp?.id ?? null) : null,
+      });
+      if (r) {
+        badge.textContent = `＋${r.xp_gained} XP（Lv${r.new_level} ${titleFor(r.new_level)}）`;
+        if (r.leveled_to) setTimeout(() => celebrateLevelUp(r.leveled_to!, state.prevLevel, r.xp), 650);
+      } else badge.textContent = '（保存失敗: 記録は端末内のみ）';
+    } catch (e) {
+      const msg = (e as Error).message ?? '';
+      badge.textContent = msg.includes('duplicate')
+        ? '（この対局はすでに記録済みです）'
+        : `（保存エラー: ${msg}）`;    // 次回の再現時に原因文字列が画面で判明する
+    }
     state.prevLevel = me.level;
   } else badge.textContent = 'AI対戦のみ: ログインで戦績とレベルが保存されます';
 }
@@ -337,6 +354,7 @@ export function boot(): void {
     state.board = applyPass(state.board);
     if (gameStatus(state.board) === 'over') { finishGame(); return; }
     checkTurn();
+    drawAll({ legal: true });   // パス後: 合法手マーカーを復元
   };
   onlineCB.onRemoteResign = async () => { stopTurnTimer(); toast('相手が投了しました'); await endMatch(); finishGame(); };
   onlineCB.onOpponentLeft = async () => {
@@ -444,6 +462,7 @@ export function boot(): void {
 // ---- 対局開始 ----
 function startAI(lv: number): void {
   state.mode = 'ai'; state.aiLevel = lv; state.humanStone = BLACK;
+  $('hud-top').querySelector('span:nth-child(2)')!.textContent = `AI Lv${lv}`;
   document.body.classList.remove('online-game');
   state.board = initialBoard(); lastMoves = [];
   show('game'); layoutBoard(); drawAll({ legal: true });
@@ -451,6 +470,7 @@ function startAI(lv: number): void {
 
 function startLocal(): void {
   state.mode = 'ai'; state.aiLevel = 0;    // aiLevel=0 = AI不出現（2人対戦モード）
+  $('hud-top').querySelector('span:nth-child(2)')!.textContent = '白';   // 上=白（下=黒）
   document.body.classList.remove('online-game');
   state.board = initialBoard(); lastMoves = [];
   show('game'); layoutBoard(); drawAll({ legal: true });

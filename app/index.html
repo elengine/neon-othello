@@ -12,8 +12,8 @@
       <!-- S1 タイトル -->
       <section id="screen-title" class="screen active">
         <h1 class="logo">NEON<br>OTHELLO</h1>
-        <button id="btn-login" class="login">🔑 Googleでログイン</button>
         <p id="app-version" class="version">v0.0.0</p>
+        <button id="btn-login" class="login">🔑 Googleでログイン</button>
         <div class="menu">
           <button id="btn-ai" class="btn btn-main">🤖 AI対戦</button>
           <button id="btn-local" class="btn btn-main">👥 2人対戦</button>
@@ -49,11 +49,14 @@
           <button id="btn-mute" class="hud-btn" aria-label="音量切り替え">🔊</button>
           <button id="btn-pause" class="hud-btn" aria-label="一時停止">⏸</button>
         </div>
-        <div id="board-stage"><canvas id="board"></canvas></div>
+        <div id="board-stage">
+          <canvas id="board"></canvas>
+          <div id="think-overlay">AIが考え中…</div>
+        </div>
         <footer id="hud-bottom">
           <span class="hud-stone hud-me"></span>
           <span id="hud-turn">黒の番</span>
-          <span class="count" id="hud-black-count">2</span>
+          <span class="count count-hid" id="hud-black-count">　</span>
         </footer>
         <div id="overlay-pause" class="pause-overlay">
           <h2 class="pause-title">一時停止</h2>

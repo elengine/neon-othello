@@ -64,7 +64,7 @@ export async function submitGame(args: {
     p_black_count: args.black_count, p_white_count: args.white_count,
     p_moves: args.moves, p_moves_svg: args.moves_svg, p_opp_user: args.opp_user ?? null,
   });
-  if (error) { console.warn('submit_game failed:', error.message); return null; }
+  if (error) { console.warn('submit_game failed:', error.message); throw new Error(error.message); }
   await refreshProfile();
   return data as SubmitResult;
 }
