@@ -13,7 +13,7 @@ import { supabaseConfigured } from './supabase/client';
 import { celebrateLevelUp } from './ui/celebrate';
 import { sfx, toggleMute, setSound } from './audio/sfx';
 import { renderRanking, renderHistory } from './ui/rankingView';
-import { initOnline, enterLobby, setWaiting, invite, isOnlinePlaying, onlineCB, setInviteHandler, endMatch, sendMove, sendPass, sendResign, saveSnapshot, type Opponent } from './net/online';
+import { initOnline, enterLobby, setWaiting, invite, isOnlinePlaying, onlineCB, setInviteHandler, endMatch, sendMove, sendPass, sendResign, saveSnapshot, leaveLobby, amWaiting, type Opponent } from './net/online';
 import { encodeMoves } from './core/board';
 
 declare const __APP_VERSION__: string | undefined;
@@ -319,13 +319,13 @@ export function boot(): void {
   $('btn-online').addEventListener('click', () => {
     if (!supabaseConfigured()) { toast('サーバー未接続: 先にDB SQLをSupabaseで実行してください'); return; }
     if (!currentProfile()) { toast('オンライン対戦はGoogleログインが必要です'); loginWithGoogle(); return; }
-    void enterLobby(renderLobby); show('lobby'); renderLobby([]); // 自分宛招待の拾得もlobby内で監視
+    void enterLobby(renderLobby); show('lobby'); renderLobby([], null); // 待機一覧=DBポーリング・招待検知もlobby内で監視
     const w = ($('chk-wait') as unknown as HTMLInputElement);
-    w.checked = false;
+    w.checked = amWaiting; // 画面往復でも待機状態を正しく復元
   });
-  $('back-lobby').addEventListener('click', () => { void setWaiting(false); show('title'); });
+  $('back-lobby').addEventListener('click', () => { leaveLobby(); show('title'); }); // 待機状態は維持（一覧監視だけ停止）
   ($('chk-wait') as unknown as HTMLInputElement).addEventListener('change', async (e) => {
-    await setWaiting((e.target as HTMLInputElement).checked); renderLobby(lastLobby);
+    await setWaiting((e.target as HTMLInputElement).checked); // 内部で refreshLobby → 一覧と自分行が即更新される
   });
   setInviteHandler((opp, accept, decline) => {
     $('invite-text').textContent = `${opp.display_name}（Lv${opp.level}）から対戦招待`;
@@ -520,9 +520,11 @@ function refreshChrome(): void {
   } else btn.textContent = '🔑 Googleでログイン';
 }
 
-let lastLobby: Opponent[] = [];
-function renderLobby(list: Opponent[]): void {
-  lastLobby = list;
+function renderLobby(list: Opponent[], me?: Opponent | null): void {
+  const meBar = $('lobby-me') as HTMLElement;
+  meBar.innerHTML = me
+    ? `<span class="lobby-you">あなたは待機中（他のプレイヤーの一覧に表示されています）</span>`
+    : '';
   const ul = $('lobby-list');
   ul.innerHTML = '';
   if (list.length === 0) {

@@ -15,7 +15,6 @@ const CB = {
 };
 export const onlineCB = CB;
 
-let lobbyCh: RealtimeChannel | null = null;
 let matchCh: RealtimeChannel | null = null;
 export let onlineState: 'offline' | 'waiting' | 'invited' | 'playing' = 'offline';
 let myInvitePoll: ReturnType<typeof setInterval> | null = null;
@@ -25,56 +24,66 @@ let lastSeqSent = 0;
 export function isOnlinePlaying(): boolean { return onlineState === 'playing'; }
 export let onlineOpponentCache: Opponent | null = null;
 
-// ---- ロビー（待機一覧） ----
-export async function enterLobby(render: (list: Opponent[]) => void): Promise<void> {
-  const sb = supabase(); const me = currentProfile();
-  if (!sb || !me) return;
-  lobbyCh = sb.channel('oth-lobby', { config: { broadcast: { self: false } } });
-  await lobbyCh.subscribe(async (status) => {
-    if (status !== 'SUBSCRIBED') return;
-    await lobbyCh!.track({ id: me.id, name: me.display_name, level: me.level, avatar: me.avatar_url, wins: me.wins, losses: me.losses, icons: me.icon_stones, waiting: false });
-    refreshList(render);
-    lobbyCh!.on('presence', { event: 'sync' }, () => refreshList(render));
-  });
-  // 自分宛招待の検知（Postgres Changes）
-  myInvitePoll = setInterval(async () => {
-    await checkInvites();
-  }, 1500);
+// ---- ロビー（待機一覧）— 2026-09-26 実機教訓: Presence廃止・oth_queue(DB)を唯一の真実としてポーリング ----
+// 旧実装は同一名channnelの多重joinで Presence が壊れ「何度やり直しても相手が表示されない」現象の原因になった。
+let lobbyRender: ((list: Opponent[], me: Opponent | null) => void) | null = null;
+let lobbyPoll: ReturnType<typeof setInterval> | null = null;
+let lobbyBeat: ReturnType<typeof setInterval> | null = null;
+export let amWaiting = false;
+
+export async function enterLobby(render: (list: Opponent[], me: Opponent | null) => void): Promise<void> {
+  lobbyRender = render;
+  if (!lobbyPoll) lobbyPoll = setInterval(() => { void refreshLobby(); }, 1800); // 1.8s間隔でDB照合（即時性と帯域のバランス）
+  if (!myInvitePoll) myInvitePoll = setInterval(() => { void checkInvites(); }, 1500);
+  await refreshLobby();
 }
 
-function refreshList(render: (list: Opponent[]) => void): void {
-  if (!lobbyCh) return;
-  const states = lobbyCh.presenceState<Record<string, unknown>>();
-  const out: Opponent[] = [];
-  for (const k of Object.keys(states)) {
-    for (const s of states[k] as Array<Record<string, unknown>>) {
-      if (s.id === currentProfile()?.id) continue;
-      if (!s.waiting) continue;
-      out.push({ id: s.id as string, display_name: s.name as string, level: s.level as number, avatar_url: (s.avatar as string) ?? null, wins: s.wins as number, losses: s.losses as number, icon_stones: !!s.icons });
-    }
+async function refreshLobby(): Promise<void> {
+  if (!lobbyRender) return;
+  const sb = supabase(); const me = currentProfile();
+  if (!sb || !me) { lobbyRender([], null); return; }
+  const { data, error } = await sb.from('oth_queue')
+    .select('user_id,status,updated_at,profile:oth_profiles!oth_queue_user_id_fkey(display_name,level,avatar_url,wins,losses,icon_stones)')
+    .eq('status', 'waiting');
+  if (error || !data) { lobbyRender([], null); return; }
+  const freshAgo = Date.now() - 180_000; // 3分以内に心跳の無い行=幽霊として除外
+  const rows: Opponent[] = [];
+  let meRow: Opponent | null = null;
+  for (const r of (data as unknown as Array<Record<string, unknown>>)) {
+    if (new Date(r.updated_at as string).getTime() < freshAgo) continue;
+    const p = r.profile as Record<string, unknown> | null;
+    if (!p) continue;
+    const o: Opponent = { id: r.user_id as string, display_name: p.display_name as string, level: p.level as number, avatar_url: (p.avatar_url as string) ?? null, wins: p.wins as number, losses: p.losses as number, icon_stones: !!p.icon_stones };
+    if (o.id === me.id) meRow = o; else rows.push(o);
   }
-  out.sort((a, b) => Math.abs(a.level - (currentProfile()?.level ?? 1)) - Math.abs(b.level - (currentProfile()?.level ?? 1)));
-  render(out);
+  rows.sort((a, b) => Math.abs(a.level - me.level) - Math.abs(b.level - me.level));
+  lobbyRender(rows, amWaiting ? meRow : null);
 }
 
 export async function setWaiting(on: boolean): Promise<void> {
   const sb = supabase(); const me = currentProfile(); if (!sb || !me) return;
   if (on) {
     await sb.from('oth_queue').upsert({ user_id: me.id, status: 'waiting', updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
-    await lobbyCh?.track({ id: me.id, name: me.display_name, level: me.level, avatar: me.avatar_url, wins: me.wins, losses: me.losses, icons: me.icon_stones, waiting: true });
+    amWaiting = true;
     onlineState = 'waiting';
+    if (!lobbyBeat) lobbyBeat = setInterval(() => { // 心跳: 閉じたタブ/端末を3分で幽霊化させないための寿命延長
+      if (amWaiting) void sb.from('oth_queue').upsert({ user_id: me.id, status: 'waiting', updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    }, 60_000);
   } else {
     await sb.from('oth_queue').delete().eq('user_id', me.id);
-    await lobbyCh?.track({ id: me.id, name: me.display_name, level: me.level, avatar: me.avatar_url, wins: me.wins, losses: me.losses, icons: me.icon_stones, waiting: false });
+    amWaiting = false;
     onlineState = 'offline';
+    if (lobbyBeat) { clearInterval(lobbyBeat); lobbyBeat = null; }
   }
+  await refreshLobby(); // 自分の行を即表示/非表示
 }
 
 // ---- 招待 ----
 export async function invite(to: Opponent): Promise<'sent' | 'busy'> {
   const sb = supabase(); const me = currentProfile(); if (!sb || !me) return 'busy';
-  const { data: q } = await sb.from('oth_queue').select('status').eq('user_id', to.id).maybeSingle();
-  if (!q || q.status !== 'waiting') return 'busy';
+  const { data: q } = await sb.from('oth_queue').select('status,updated_at').eq('user_id', to.id).maybeSingle();
+  // 一覧と同基準（3分内の心跳）で生存確認 → 幽霊待機への招待＝「既に離脱」を防止
+  if (!q || q.status !== 'waiting' || Date.now() - new Date(q.updated_at as string).getTime() > 180_000) return 'busy';
   const { error } = await sb.from('oth_invites').insert({ from_user: me.id, to_user: to.id });
   if (error) return 'busy';
   onlineState = 'invited';
@@ -206,8 +215,10 @@ export async function endMatch(ended = true): Promise<void> {
 
 export function onboardingHooks(): typeof CB { return CB; }
 export function leaveLobby(): void {
-  if (myInvitePoll) clearInterval(myInvitePoll);
-  void lobbyCh?.unsubscribe(); lobbyCh = null;
+  if (myInvitePoll) { clearInterval(myInvitePoll); myInvitePoll = null; }
+  if (lobbyPoll) { clearInterval(lobbyPoll); lobbyPoll = null; }
+  lobbyRender = null;
+  // 待機状態そのものは維持（タイトルに戻るだけ＝離脱ではない。閉じた端末は心跳停止で3分後に自動消える）
 }
 function sleep(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)); }
 
