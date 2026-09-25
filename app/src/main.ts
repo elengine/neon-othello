@@ -149,14 +149,21 @@ function checkTurn(): void {
   drawAll({ legal: true });
   if (gameStatus(state.board) === 'over') { finishGame(); return; }
   if (legalBB(state.board.bb, state.board.turn) === 0n) {
+    // v1.9.0修正: オンラインで「相手の手番に打てる手が無い」とき、自端末だけで黙って相手足を
+    // 自動パスすると、相手の正規パス通知と二重計上され passCount=2 で誤終局する（実機報告）。
+    // 自プレイヤーのパスのみこの関数が適用し、相手分は相手の broadcast/タイムアウトに委ねる。
+    if (state.mode === 'online' && state.board.turn !== state.humanStone) {
+      startTurnTimer();  // 相手の正規通知が届かない場合の60秒フォールバック（timeout→相手パス1回計上）
+      return;
+    }
     // パス発生
     $('pass-toast').classList.add('show');
     playSound('pass');
     setTimeout(() => $('pass-toast').classList.remove('show'), 1400);
-    if (state.mode === 'online' && state.board.turn === state.humanStone) sendPass();
+    if (state.mode === 'online') sendPass();
     state.board = applyPass(state.board);
     if (gameStatus(state.board) === 'over') { finishGame(); return; }
-    drawAll({ legal: true });   // v1.8.0: パスで手番が返った盤面に即再描画（マーカーが出ない不具合対策）
+    drawAll({ legal: true });
   }
   if (state.mode === 'online') { startTurnTimer(); return; } // AI禁止・相手待ちタイマー
   if (state.aiLevel === 0) return;                          // 2人対戦: 交代で両者タップ
@@ -366,6 +373,10 @@ export function boot(): void {
   };
   onlineCB.onRemotePass = () => {
     if (state.screen !== 'game' || state.mode !== 'online') return;
+    // v1.9.0: 二重計上防止。正規の相手パスは「自盤面が相手足のとき」だけ計上する。
+    // 既に自分の番なら重複/遅延イベントなので無視（旧: 自端末で相手足を自動パス計上＋
+    // 相手の正規通知を二重計上し passCount=2 で誤終局 → 実機報告の症状）
+    if (state.board.turn === state.humanStone) return;
     stopTurnTimer(); toast('相手は打てません（パス）');
     state.board = applyPass(state.board);
     if (gameStatus(state.board) === 'over') { finishGame(); return; }
