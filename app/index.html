@@ -42,6 +42,7 @@
           <span class="hud-stone hud-opp"></span>
           <span>AI</span>
           <span class="count" id="hud-white-count">2</span>
+          <button id="btn-pause" class="hud-btn" aria-label="一時停止" style="display:none">⏸</button>
         </header>
         <div id="board-stage"><canvas id="board"></canvas></div>
         <footer id="hud-bottom">
@@ -50,6 +51,11 @@
           <span class="count" id="hud-black-count">2</span>
           <button id="btn-mute" class="mute-btn" aria-label="音量切り替え">🔊</button>
         </footer>
+        <div id="overlay-pause" class="pause-overlay">
+          <h2 class="pause-title">一時停止</h2>
+          <button id="btn-resume" class="btn">▶ 再開</button>
+          <button id="btn-quit" class="btn btn-ghost">🚪 ゲーム終了</button>
+        </div>
         <div id="pass-toast">パス！</div>
         <button id="btn-resign" class="resign">投了</button>
       </section>
@@ -111,6 +117,17 @@
           <label class="wait-toggle"><input type="checkbox" id="chk-icon"><span>Googleアイコンを自分の石に使う</span></label>
         </div>
         <p class="hint">※ オンライン対戦でアイコン石を使うには相手の同意（オプトイン）が必要です</p>
+        <h2 style="margin-top:18px">サウンド</h2>
+        <div class="pickers">
+          <label class="wait-toggle"><input type="checkbox" id="chk-sound" checked><span>効果音を鳴らす</span></label>
+        </div>
+        <h2 style="margin-top:18px">コンピュータの打つ速度</h2>
+        <div class="pace-row" id="pace-row">
+          <button class="pace-btn" data-pace="normal">普通</button>
+          <button class="pace-btn" data-pace="slow">遅い</button>
+          <button class="pace-btn" data-pace="fast">早い</button>
+          <button class="pace-btn" data-pace="jitter">ゆらぎ</button>
+        </div>
       </section>
     </div>
     <script type="module" src="/src/main.ts"></script>

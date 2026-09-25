@@ -75,6 +75,7 @@ export type RankSort = 'xp' | 'wins' | 'winrate';
 export async function fetchRanking(sort: RankSort, limit = 100): Promise<RankRow[]> {
   const sb = supabase(); if (!sb) return [];
   let q = sb.from('oth_profiles').select('id,display_name,avatar_url,level,xp,wins,losses,draws');
+  q = q.or('wins.gt.0,losses.gt.0,draws.gt.0');  // 実績ゼロのユーザーはランキングに出さない
   if (sort === 'winrate') {
     const { data } = await q.order('wins', { ascending: false }).limit(500);
     const rows = (data ?? []) as RankRow[];

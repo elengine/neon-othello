@@ -89,6 +89,9 @@ create policy oth_profiles_read    on public.oth_profiles for select using (true
 drop policy if exists oth_profiles_write_own on public.oth_profiles;
 create policy oth_profiles_write_own on public.oth_profiles
   for update using (auth.uid() = id);
+drop policy if exists oth_profiles_insert_own on public.oth_profiles;
+create policy oth_profiles_insert_own on public.oth_profiles
+  for insert with check (auth.uid() = id);
 -- ※ display_name 以外は RPC のみが更新（クライアント更新を列レベルで制限）
 
 drop policy if exists oth_games_read     on public.oth_games;

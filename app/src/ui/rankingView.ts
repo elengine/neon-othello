@@ -22,7 +22,8 @@ export async function renderRanking(): Promise<void> {
   }
   list.innerHTML = '';
   rows.forEach((r, i) => list.appendChild(rankRow(r, i + 1, me?.id === r.id)));
-  if (me && !rows.some((r) => r.id === me.id)) {
+  const myGames = (me?.wins ?? 0) + (me?.losses ?? 0) + (me?.draws ?? 0);
+  if (me && myGames > 0 && !rows.some((r) => r.id === me.id)) {
     const rank = await myRank(tab === 'wins' ? 'wins' : 'xp');
     const sep = document.createElement('li'); sep.className = 'rank-sep'; sep.textContent = '…';
     list.appendChild(sep);
