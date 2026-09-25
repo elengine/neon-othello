@@ -43,9 +43,11 @@ const Prefs = {
   sound: true,
   mkRing: 0.9,                  // マーカー外枠の不透明度 (0.1〜1)
   mkDot: 1.0,                   // マーカー中心ドットの不透明度
+  mkRingColor: 'theme' as 'theme' | 'white',
+  mkDotColor: 'white' as 'theme' | 'white',
 };
 const PACE_KEY = 'otv2:prefs';
-function savePrefs(): void { try { localStorage.setItem(PACE_KEY, JSON.stringify({ pace: Prefs.pace, sound: Prefs.sound, mkRing: Prefs.mkRing, mkDot: Prefs.mkDot })); } catch { /* 非対応環境 */ } }
+function savePrefs(): void { try { localStorage.setItem(PACE_KEY, JSON.stringify({ pace: Prefs.pace, sound: Prefs.sound, mkRing: Prefs.mkRing, mkDot: Prefs.mkDot, mkRingColor: Prefs.mkRingColor, mkDotColor: Prefs.mkDotColor })); } catch { /* 非対応環境 */ } }
 function loadPrefs(): void {
   try {
     const raw = JSON.parse(localStorage.getItem(PACE_KEY) ?? '{}');
@@ -53,6 +55,8 @@ function loadPrefs(): void {
     if (typeof raw.sound === 'boolean') Prefs.sound = raw.sound;
     if (typeof raw.mkRing === 'number') Prefs.mkRing = raw.mkRing;
     if (typeof raw.mkDot === 'number') Prefs.mkDot = raw.mkDot;
+    if (raw.mkRingColor === 'theme' || raw.mkRingColor === 'white') Prefs.mkRingColor = raw.mkRingColor;
+    if (raw.mkDotColor === 'theme' || raw.mkDotColor === 'white') Prefs.mkDotColor = raw.mkDotColor;
   } catch { /* 破損時は既定 */ }
 }
 
@@ -286,6 +290,8 @@ function applyTheme(): void {
   state.theme = state.themeName === 'classic' ? CLASSIC : NEON_DEFAULT;
   state.theme.markerRing = Prefs.mkRing;
   state.theme.markerDot = Prefs.mkDot;
+  state.theme.markerRingColor = Prefs.mkRingColor;
+  state.theme.markerDotColor = Prefs.mkDotColor;
   document.documentElement.style.setProperty('--stone-black', state.theme.black);
   document.documentElement.style.setProperty('--stone-white', state.theme.white);
   renderer = makeRenderer($('board') as unknown as HTMLCanvasElement, state.theme);
@@ -293,7 +299,7 @@ function applyTheme(): void {
 
 async function setPref(black: string, white: string, glow: string, boardBg: string, iconOn: boolean): Promise<void> {
   const th = prefToTheme({ black, white, glow, boardBg });
-  th.markerRing = Prefs.mkRing; th.markerDot = Prefs.mkDot;
+  th.markerRing = Prefs.mkRing; th.markerDot = Prefs.mkDot; th.markerRingColor = Prefs.mkRingColor; th.markerDotColor = Prefs.mkDotColor;
   if (iconOn && currentProfile()?.avatar_url) {
     const im = await loadImage(currentProfile()!.avatar_url!);
     // 自分の石（黒側=先手想定）にアイコン。相手のアイコンはオンライン時のみ他モジュールで設定
@@ -472,6 +478,21 @@ export function boot(): void {
     savePrefs();
   };
   mkR.addEventListener('input', applyMk); mkD.addEventListener('input', applyMk);
+
+  // 色: テーマ色/白 セグメント（即反映・永続）
+  const paintSeg = () => {
+    for (const [segId, sel] of [['seg-ring-color', Prefs.mkRingColor], ['seg-dot-color', Prefs.mkDotColor]] as const) {
+      document.querySelectorAll(`#${segId} .seg-btn`).forEach((b) =>
+        b.classList.toggle('picked', (b as HTMLElement).dataset.vc === sel));
+    }
+  };
+  for (const [segId, setter] of [['seg-ring-color', (v: 'theme' | 'white') => { Prefs.mkRingColor = v; }], ['seg-dot-color', (v: 'theme' | 'white') => { Prefs.mkDotColor = v; }]] as const) {
+    document.querySelectorAll(`#${segId} .seg-btn`).forEach((b) => b.addEventListener('click', () => {
+      setter((b as HTMLElement).dataset.vc === 'white' ? 'white' : 'theme');
+      savePrefs(); paintSeg(); applyMk();
+    }));
+  }
+  paintSeg();
   setSound(Prefs.sound);   // 初期化時: 端末保存値を音の実体へ
   ($('btn-mute') as HTMLElement).textContent = Prefs.sound ? '🔊' : '🔇';
 

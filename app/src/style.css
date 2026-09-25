@@ -317,6 +317,14 @@ header, footer { transition: border-color .18s, background .18s, box-shadow .18s
 .result-card .btn { min-width: min(280px, 74vw); padding: 14px 32px; font-size: 19px; font-weight: 800; border-radius: 999px; }
 
 /* ===== v1.1.0: テーマ名折り返し禁止 + マーカースライダー */
-.lv-card .lv-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.lv-card .lv-name { white-space: nowrap; overflow: visible; }   /* 折り返さない・省略なし（字を小さくして全文表示） */
 .mkv { min-width: 4.2em; text-align: right; color: var(--gold); font-size: 15px; font-weight: 800; }
 .pick input[type="range"] { width: 120px; accent-color: #1de5ff; }
+
+/* ===== v1.2.0: マーカー色セグメント + テーマ名小サイズ化 ===== */
+.seg { display: inline-flex; gap: 6px; }
+.seg-btn { padding: 8px 16px; border-radius: 999px; border: 1px solid #1de5ff44; background: #0b1428;
+  color: #cfeaff; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.seg-btn.picked { background: linear-gradient(95deg,#00c8e0,#5c7bff); color: #fff; border-color: transparent;
+  box-shadow: 0 0 16px rgba(0,220,255,.35); }
+.lv-card .lv-name { font-size: 14px; }   /* 折り返し→省略から省略なしへ。小さくして全文表示 */

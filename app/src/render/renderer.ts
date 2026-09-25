@@ -12,6 +12,8 @@ export interface StoneTheme {
   whiteIcon?: HTMLImageElement | null;
   markerRing?: number;   // 合法手マーカー外枠の不透明度 (0〜1, 既定 0.9)
   markerDot?: number;    // 合法手マーカー中心ドットの不透明度 (0〜1, 既定 1.0)
+  markerRingColor?: 'theme' | 'white';  // 外枠の色種
+  markerDotColor?: 'theme' | 'white';   // 中心ドットの色種
 }
 
 export const NEON_DEFAULT: StoneTheme = {
@@ -103,7 +105,9 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
     // 合法手マーカー（外枠=現在のテーマ色/手番石色。不透明度はテーマ設定で調整可）
     if (o.legal) {
       const lm = legalBB(board.bb, board.turn);
-      const ringColor = board.turn === BLACK ? theme.black : theme.white;
+      const turnColor = board.turn === BLACK ? theme.black : theme.white;
+      const ringColor = (theme.markerRingColor === 'white') ? '#ffffff' : turnColor;
+      const dotColor = (theme.markerDotColor === 'theme') ? turnColor : '#ffffff';
       const ringA = theme.markerRing ?? 0.9;
       const dotA = theme.markerDot ?? 1.0;
       let m = lm;
@@ -117,7 +121,7 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
         ctx.globalAlpha = ringA; ctx.stroke();
         // 芯（白ドット・視認の核）
         ctx.beginPath(); ctx.arc(cx, cy, cell * 0.10, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffffff'; ctx.globalAlpha = dotA; ctx.fill();
+        ctx.fillStyle = dotColor; ctx.globalAlpha = dotA; ctx.fill();
         ctx.globalAlpha = 1;
       }
     }
