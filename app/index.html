@@ -12,6 +12,7 @@
       <!-- S1 タイトル -->
       <section id="screen-title" class="screen active">
         <h1 class="logo">NEON<br>OTHELLO</h1>
+        <button id="btn-login" class="login">🔑 Googleでログイン</button>
         <p id="app-version" class="version">v0.0.0</p>
         <div class="menu">
           <button id="btn-ai" class="btn btn-main">🤖 AI対戦</button>
@@ -22,7 +23,6 @@
           <button id="btn-ranking" class="btn btn-ghost2">🏆 ランキング</button>
           <button id="btn-settings" class="btn btn-ghost2">⚙️ 設定</button>
         </div>
-        <button id="btn-login" class="btn btn-ghost2 login">🔑 Googleでログイン</button>
       </section>
 
       <!-- S2 難易度 -->
@@ -43,11 +43,12 @@
         <header id="hud-top">
           <span class="hud-stone hud-opp"></span>
           <span>AI</span>
-          <span class="count" id="hud-white-count">2</span>
-          <span class="hud-spacer"></span>
+          <span class="count count-hid" id="hud-white-count">　</span>
+        </header>
+        <div class="hud-actions">
           <button id="btn-mute" class="hud-btn" aria-label="音量切り替え">🔊</button>
           <button id="btn-pause" class="hud-btn" aria-label="一時停止">⏸</button>
-        </header>
+        </div>
         <div id="board-stage"><canvas id="board"></canvas></div>
         <footer id="hud-bottom">
           <span class="hud-stone hud-me"></span>
@@ -127,10 +128,10 @@
         </div>
         <h2 style="margin-top:18px">コンピュータの打つ速度</h2>
         <div class="pace-row" id="pace-row">
+          <button class="pace-btn" data-pace="jitter">ゆらぎ</button>
+          <button class="pace-btn" data-pace="fast">早い</button>
           <button class="pace-btn" data-pace="normal">普通</button>
           <button class="pace-btn" data-pace="slow">遅い</button>
-          <button class="pace-btn" data-pace="fast">早い</button>
-          <button class="pace-btn" data-pace="jitter">ゆらぎ</button>
         </div>
       </section>
     </div>
