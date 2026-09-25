@@ -36,7 +36,11 @@ body {
   font-size: 16px; font-family: inherit; cursor: pointer; text-align: center;
 }
 .btn:active { transform: scale(.97); border-color: var(--accent); }
-.btn-ghost { background: transparent; border-color: transparent; color: #8fa3c8; }
+/* ランキング/設定/ログイン: 囲み枠のみ・グローなし（主ボタンとの差別化） */
+.btn-ghost2 { background: transparent; border: 1px solid #2a3a5f; color: #bcd2f5;
+  font-size: 17px; font-weight: 700; animation: none !important; box-shadow: none !important; }
+.btn-ghost2:active { border-color: var(--accent); }
+.btn-main { font-size: 19px; font-weight: 800; padding: 17px 18px; }   /* プレイ開始ボタン群: 大型 */
 h2 { color: var(--gold); font-size: 20px; font-weight: 400; margin: 12px 0 18px; }
 .back { background: none; border: none; color: #8fa3c8; font-size: 14px; align-self: flex-start; padding: 6px 2px; cursor: pointer; }
 .levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; width: min(460px, 92vw); }
@@ -129,7 +133,7 @@ header, footer {
 .hist-score { color: #8fa3c8; white-space: nowrap; }
 .hist-xp { color: var(--gold); width: 3em; text-align: right; }
 .xp-line { color: var(--gold); font-size: 13px; margin: 2px 0 8px; min-height: 1.2em; }
-.login { margin-top: 12px; font-size: 13px; }
+.login { margin-top: 12px; font-size: 16px; }
 #screen-ranking { align-items: center; width: 100%; }
 
 /* ---- オンライン: 招待モーダル / 待機トグル / 一覧 ---- */
@@ -179,14 +183,16 @@ body.online-game .resign { display: block; }
 /* ---- 設定画面: 下マージン確保 ---- */
 #screen-settings { padding-bottom: 72px; }
 
-/* ---- タイトル グローアニメ（neonPulse/ctaGlow @keyframes 定義） ---- */
+/* ---- タイトル グローアニメ（多重付与の解消: ctaGlow は主ボタンのみ・単一source） ---- */
 .logo { animation: neonPulse 3.2s ease-in-out infinite; }
+.menu .btn-main { animation: ctaGlow 3.2s ease-in-out infinite; }   /* 対戦選択3ボタンのみ */
+.menu .btn:nth-child(2) { animation-delay: -1.06s; }   /* 位相を1/3ずつずらす（多重に見えない呼吸） */
+.menu .btn:nth-child(3) { animation-delay: -2.13s; }
+.menu .btn.btn-ghost { animation: none; box-shadow: none; }   /* ランキング/設定はグローなし */
 @keyframes neonPulse {
   0%, 100% { filter: drop-shadow(0 0 18px rgba(0,240,255,.45)) drop-shadow(0 0 44px rgba(200,107,255,.25)); }
   50% { filter: drop-shadow(0 0 26px rgba(0,240,255,.8)) drop-shadow(0 0 70px rgba(200,107,255,.5)); }
 }
-.menu .btn { animation: ctaGlow 2.6s ease-in-out infinite; }
-.menu .btn:nth-child(2) { animation-delay: 0.8s; }
 @keyframes ctaGlow {
   0%, 100% { box-shadow: 0 6px 24px rgba(0,220,255,.32), 0 3px 14px rgba(160,90,255,.26); }
   50% { box-shadow: 0 10px 42px rgba(0,220,255,.68), 0 6px 24px rgba(160,90,255,.5); }
@@ -208,3 +214,13 @@ body.online-game .resign { display: block; }
 /* ---- 全般: 最小文字サイズ底上げ（小さすぎ箇所の統一） ---- */
 .hint, .hist-list li, .rank-me { font-size: 15px; }
 .lv-name { font-size: 17px; }
+
+/* ---- 設定画面: 大型トグル & 大スウォッチ ---- */
+.wait-toggle { font-size: 17px; gap: 12px; padding: 10px 0; }
+.wait-toggle input[type="checkbox"] { width: 28px; height: 28px; accent-color: #1de5ff; cursor: pointer; }
+.pickers { gap: 14px; }
+.pick { font-size: 17px; gap: 14px; }
+.pick input[type="color"] { width: 58px; height: 40px; border-radius: 10px; border: 1px solid #2a3a5f; cursor: pointer; }
+.lv-card.preset-card { padding: 22px 12px; }
+#preset-grid .lv-card { padding: 22px 12px; }
+.swatch { width: 64px; height: 30px; border-radius: 15px; }

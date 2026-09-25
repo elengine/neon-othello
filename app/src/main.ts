@@ -92,8 +92,10 @@ function drawAll(opts: { legal?: boolean } = {}): void {
     flipAnim: state.pendingFlip.cells.length ? state.pendingFlip.anim : undefined,
   });
   const { black, white } = stoneCount(state.board);
-  $('hud-black-count').textContent = String(black);
-  $('hud-white-count').textContent = String(white);
+  // 石数は対局が終わるまで非表示（ご指示: 終了時までわからないように）
+  const over = gameStatus(state.board) === 'over';
+  $('hud-black-count').textContent = over ? String(black) : '?';
+  $('hud-white-count').textContent = over ? String(white) : '?';
   $('hud-turn').textContent = gameStatus(state.board) === 'over' ? '対局終了'
     : (state.board.turn === BLACK ? '黒' : '白') + 'の番'
     + (state.thinking ? '（AI思考中…）' : '');
