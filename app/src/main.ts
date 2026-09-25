@@ -362,6 +362,9 @@ export function boot(): void {
     drawAll({ legal: true });   // パス後: 合法手マーカーを復元
   };
   onlineCB.onRemoteResign = async () => { stopTurnTimer(); toast('相手が投了しました'); await endMatch(); finishGame(); };
+  // 招待の応答ハンドリング（v1.5.0）: 承諾されるまで招待側はゲーム画面に移行しない
+  onlineCB.onInviteDeclined = (opp) => { toast(`${opp.display_name} が招待を拒否しました`); };
+  onlineCB.onInviteTimeout = (opp) => { toast(`${opp.display_name} から応答がありません`); };
   onlineCB.onOpponentLeft = async () => {
     if (!isOnlinePlaying()) return;
     toast('相手が切断されました（60秒以内に復帰ないと不戦勝）');

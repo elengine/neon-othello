@@ -12,6 +12,8 @@ const CB = {
   onRemoteResign: null as (() => void) | null,
   onMatchStart: null as ((isBlack: boolean, opp: Opponent, moves: string) => void) | null,
   onOpponentLeft: null as (() => void) | null,
+  onInviteDeclined: null as ((opp: Opponent) => void) | null,
+  onInviteTimeout: null as ((opp: Opponent) => void) | null,
 };
 export const onlineCB = CB;
 
@@ -84,20 +86,54 @@ export async function invite(to: Opponent): Promise<'sent' | 'busy'> {
   const { data: q } = await sb.from('oth_queue').select('status,updated_at').eq('user_id', to.id).maybeSingle();
   // 一覧と同基準（3分内の心跳）で生存確認 → 幽霊待機への招待＝「既に離脱」を防止
   if (!q || q.status !== 'waiting' || Date.now() - new Date(q.updated_at as string).getTime() > 180_000) return 'busy';
-  const { error } = await sb.from('oth_invites').insert({ from_user: me.id, to_user: to.id });
-  if (error) return 'busy';
+  const { data: ins, error } = await sb.from('oth_invites').insert({ from_user: me.id, to_user: to.id }).select('id').single();
+  if (error || !ins) return 'busy';
   onlineState = 'invited';
-  void startMatch(to);   // 招待側も承諾待ちで対局開始へ進む
+  void awaitInviteThenStart(ins.id as string, to);   // この招待IDの応答だけを待つ（v1.5.0: 古いaccepted行の流用バグ修正）
   return 'sent';
 }
 
+/** 招待側: 自分が出した招待IDの status 変化（accepted/declined/expired）だけを監視して合流 */
+async function awaitInviteThenStart(inviteId: string, opp: Opponent): Promise<void> {
+  const sb = supabase(); const me = currentProfile(); if (!sb || !me) return;
+  const myId = me.id, oppId = opp.id;
+  onlineState = 'invited';
+  for (let i = 0; i < 40; i++) { // 最大40秒
+    await sleep(1000);
+    const { data } = await sb.from('oth_invites').select('status').eq('id', inviteId).maybeSingle();
+    const st = data?.status as string | undefined;
+    if (st === 'declined') {
+      onlineState = amWaiting ? 'waiting' : 'offline';
+      CB.onInviteDeclined?.(opp);
+      void refreshLobby();
+      return;
+    }
+    if (st !== 'accepted') continue;
+    // 承諾された → 招待者（自分）=黒 でマッチ作成（既存RPC・2値版）
+    const { data: md } = await sb.rpc('oth_match_start', { p_black: myId, p_white: oppId });
+    const matchId = (md as string) ?? null;
+    if (!matchId) { CB.onInviteTimeout?.(opp); onlineState = amWaiting ? 'waiting' : 'offline'; return; }
+    currentMatchId = matchId; onlineOpponentCache = opp;
+    onlineState = 'playing';
+    await subscribeMatch(matchId, true, opp);
+    return;
+  }
+  // タイムアウト: 招待を行ごと expired にして消す（相手には出っ放しにしない）
+  await sb.from('oth_invites').update({ status: 'expired' }).eq('id', inviteId).eq('status', 'pending');
+  if (onlineState === 'invited') {
+    onlineState = amWaiting ? 'waiting' : 'offline';
+    CB.onInviteTimeout?.(opp);
+    void refreshLobby();
+  }
+}
+
 async function checkInvites(): Promise<void> {
-  const sb = supabase(); const me = currentProfile(); if (!sb || !me || onlineState === 'playing') return;
+  const sb = supabase(); const me = currentProfile(); if (!sb || !me || onlineState === 'playing' || onlineState === 'invited') return;
   const { data } = await sb.from('oth_invites').select('id,from_user,status,created_at,from:oth_profiles!oth_invites_from_user_fkey(display_name,level,avatar_url,wins,losses,icon_stones)')
     .eq('to_user', me.id).eq('status', 'pending').order('created_at', { ascending: false }).limit(1).maybeSingle();
   if (!data) return;
   const age = Date.now() - new Date(data.created_at as string).getTime();
-  if (age > 30000) {
+  if (age > 45000) { // 招待側の待機が40秒で切れるため、45秒過ぎた自分宛pendingのみ消す
     await sb.from('oth_invites').update({ status: 'expired' }).eq('id', data.id as string);
     return;
   }
@@ -116,56 +152,37 @@ function showIncomingInvite(inviteId: string, opp: Opponent): void {
     async () => { await acceptInvite(inviteId, opp); },
     async () => {
       await supabase()?.from('oth_invites').update({ status: 'declined' }).eq('id', inviteId);
-      onlineState = 'offline';
+      onlineState = amWaiting ? 'waiting' : 'offline';
+      void refreshLobby();
     });
 }
 
+/** 招待された側: 承諾 → 自分宛招待の accepted を見張り、招待側が作った match に合流する */
 async function acceptInvite(inviteId: string, opp: Opponent): Promise<void> {
   const sb = supabase(); const me = currentProfile(); if (!sb || !me) return;
+  const myId = me.id, inviterId = opp.id;
   await sb.from('oth_invites').update({ status: 'accepted' }).eq('id', inviteId);
-  onlineState = 'playing';
-  // 招待者（黒）が oth_match_start を作り、双方が startMatch ループで合流する
-  void startMatch(opp);
-}
-
-/** 招待側: 相手承諾を待って対局開始 */
-async function startMatch(opp: Opponent): Promise<void> {
-  const sb = supabase(); const me = currentProfile(); if (!sb || !me) return;
-  const myId = me.id, oppId = opp.id;
-  // 承諾済み招待が存在するかポーリング（招待側のみ進行開始）
+  onlineState = 'invited'; // 対局作成待ち
   for (let i = 0; i < 30; i++) {
     await sleep(1000);
-    const { data } = await sb.from('oth_invites').select('id,from_user,to_user')
-      .eq('to_user', myId).eq('from_user', oppId).eq('status', 'accepted').order('created_at', { ascending: false }).limit(1).maybeSingle();
-    let accepted = !!data;
-    let pair: [string, string] = data ? [data.from_user as string, data.to_user as string] : [myId, oppId];
-    if (!accepted) {
-      // 自分が招待側: from_user=自分 の accepted を探す
-      const { data: d2 } = await sb.from('oth_invites').select('id,from_user,to_user')
-        .eq('from_user', myId).eq('to_user', oppId).eq('status', 'accepted').order('created_at', { ascending: false }).limit(1).maybeSingle();
-      accepted = !!d2; if (d2) pair = [d2.from_user as string, d2.to_user as string];
+    // 招待側がマッチを作ったか（招待された側=白）
+    const { data } = await sb.from('oth_matches').select('id')
+      .eq('black', inviterId).eq('white', myId).eq('status', 'active')
+      .order('updated_at', { ascending: false }).limit(1).maybeSingle();
+    const matchId = (data?.id as string) ?? null;
+    if (matchId) {
+      currentMatchId = matchId; onlineOpponentCache = opp;
+      onlineState = 'playing';
+      await subscribeMatch(matchId, false, opp);
+      return;
     }
-    if (!accepted) continue;
-    // 黒がマッチ作成
-    const isBlack = pair[0] === myId;
-    let matchId: string | null = null;
-    if (isBlack) {
-      const { data } = await sb.rpc('oth_match_start', { p_black: pair[0], p_white: pair[1] });
-      matchId = (data as string) ?? null;
-    } else {
-      // 白側: 黒が作った match を待つ
-      for (let k = 0; k < 15 && !matchId; k++) {
-        await sleep(1000);
-        const { data } = await sb.from('oth_matches').select('id').eq('black', pair[0]).eq('white', pair[1]).eq('status', 'active').order('updated_at', { ascending: false }).limit(1).maybeSingle();
-        matchId = (data?.id as string) ?? null;
-      }
-    }
-    if (!matchId) continue;
-    currentMatchId = matchId; onlineOpponentCache = opp;
-    await subscribeMatch(matchId, isBlack, opp);
-    return;
+    // 招待側が途中で切れた（expired/削除）ら待つのをやめる
+    const { data: inv } = await sb.from('oth_invites').select('status').eq('id', inviteId).maybeSingle();
+    if (!inv || inv.status === 'expired') break;
   }
-  onlineState = 'offline';
+  onlineState = amWaiting ? 'waiting' : 'offline';
+  CB.onInviteTimeout?.(opp);
+  void refreshLobby();
 }
 
 async function subscribeMatch(matchId: string, iAmBlack: boolean, opp: Opponent): Promise<void> {
