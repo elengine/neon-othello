@@ -174,9 +174,12 @@ begin
      or (new.wins is distinct from old.wins) or (new.losses is distinct from old.losses)
      or (new.draws is distinct from old.draws) or (new.streak is distinct from old.streak)
      or (new.best_streak is distinct from old.best_streak) then
+    -- security definer RPC(othello_submit_game) 自身による更新は許可する:
+    -- RPC関数内で set config がされている場合(oth_rpc=true)はOK
     if current_setting('role', true) <> 'supabase_admin'
+       and coalesce(current_setting('app.oth_rpc', true), '') <> 'on'
        and not (select coalesce(current_setting('request.jwt.claims', true), '') like '%"service_role"%') then
-      raise exception 'stats columns are RPC-only';
+    raise exception 'stats columns are RPC-only';
     end if;
   end if;
   return new;
@@ -202,6 +205,7 @@ declare
   gain int; w int; l int; d int; st int; bs int;
   uid_hash text; dup boolean;
 begin
+  perform set_config('app.oth_rpc', 'on', true);   -- stats guard に RPC 経由だと通知（トランザクション内）
   if me is null then raise exception 'not logged in'; end if;
   if p_mode not in ('ai','online','local') then raise exception 'bad mode'; end if;
   if p_result not in ('win','lose','draw') then raise exception 'bad result'; end if;

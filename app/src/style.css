@@ -309,3 +309,6 @@ header, footer { transition: border-color .18s, background .18s, box-shadow .18s
 /* AI思考オーバーレイ: 文字を大きく */
 #think-overlay { font-size: clamp(24px, 7vw, 34px); font-weight: 800; letter-spacing: .1em;
   color: #eaffff; text-shadow: 0 0 18px rgba(0,240,255,.6); }
+
+/* ===== v0.9.0 終了画面ボタン大型化 ===== */
+.result-card .btn { min-width: min(280px, 74vw); padding: 14px 32px; font-size: 19px; font-weight: 800; border-radius: 999px; }

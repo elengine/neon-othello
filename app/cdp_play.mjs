@@ -38,7 +38,7 @@ const run = async () => {
   await tapCell(2, 4); // 黒の合法手 1つ目
   await new Promise((r) => setTimeout(r, 1800)); // めくり+AI応手待ち
 
-  const turnText = await evalJs(`document.getElementById('hud-turn').textContent`);
+  const turnText = await evalJs(`document.getElementById('hud-me-name').textContent`);
   const counts = await evalJs(`document.getElementById('hud-black-count').textContent + '-' + document.getElementById('hud-white-count').textContent`);
   console.log('縦長プレイ後 turn:', turnText, ' counts:', counts);
   await Page.captureScreenshot({ format: 'png' }).then((s) => {
@@ -57,7 +57,7 @@ const run = async () => {
   await Page.captureScreenshot({ format: 'png' }).then((s) => {
     import('fs').then((fs) => fs.writeFileSync('/tmp/oth_landscape.png', Buffer.from(s.data, 'base64')));
   });
-  const turn2 = await evalJs(`document.getElementById('hud-turn').textContent`);
+  const turn2 = await evalJs(`document.getElementById('hud-me-name').textContent`);
   console.log('回転後も手番維持:', turn2);
   await client.close();
 };

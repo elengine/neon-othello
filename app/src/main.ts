@@ -98,7 +98,7 @@ function drawAll(opts: { legal?: boolean } = {}): void {
   $('hud-white-count').textContent = over ? String(white) : '　';
   // 手番は騎手アイコンの光強調で示す（文言はなし）。
   // AI思考中は盤面上に透過オーバーレイで表示（盤外HUDには出さない）
-  $('hud-turn').textContent = gameStatus(state.board) === 'over' ? '対局終了' : '';
+  if (gameStatus(state.board) === 'over') $('hud-me-name').textContent = '対局終了';
   const meOn = state.board.turn === state.humanStone;
   // 手番は【アイコンの外側エリア（対戦者バー全体）】の枠+背景色で強調
   const meBar = document.querySelector('.hud-me')?.closest('footer') ?? null;
@@ -339,7 +339,7 @@ export function boot(): void {
     document.body.classList.add('online-game');
     state.board = initialBoard(); lastMoves = [];
     show('game'); layoutBoard();
-    $('hud-top').querySelector('span:nth-child(2)')!.textContent = `${opp.display_name} Lv${opp.level}`;
+    refreshPlayerLabels();
     toast(`対戦開始！ ${opp.display_name}（Lv${opp.level}） vs あなた${iAmBlack ? '（黒=先手）' : '（白=後手）'}`);
   };
   onlineCB.onRemoteMove = (cell) => {
@@ -457,11 +457,31 @@ export function boot(): void {
   screen.orientation?.addEventListener?.('change', () => setTimeout(() => { if (state.screen === 'game') layoutBoard(); }, 120));
 
   applyTheme(); show('title');
+  refreshPlayerLabels();
   void initAuth(async (s) => {
     if (s) await refreshProfile();
     refreshChrome();
+    refreshPlayerLabels();
     if (s) { void restorePref(); void initOnline(); }
   });
+}
+
+// ---- 対戦者ラベル: アイコン右の名前 ----
+function refreshPlayerLabels(): void {
+  const me = currentProfile();
+  const myName = me?.display_name?.slice(0, 12) ?? 'あなた';
+  const bottomLabel = $('hud-me-name');
+  const topLabel = $('hud-opp-name');
+  if (state.mode === 'online' && state.opp) {
+    topLabel!.textContent = `${state.opp.display_name.slice(0, 12)} Lv${state.opp.level}`;
+    bottomLabel!.textContent = myName;
+  } else if (state.aiLevel === 0) {
+    topLabel!.textContent = '白';
+    bottomLabel!.textContent = '黒';
+  } else {
+    topLabel!.textContent = `AI Lv${state.aiLevel}`;
+    bottomLabel!.textContent = myName;
+  }
 }
 
 // ---- 対局開始 ----
@@ -476,6 +496,7 @@ function startAI(lv: number): void {
 function startLocal(): void {
   state.mode = 'ai'; state.aiLevel = 0;    // aiLevel=0 = AI不出現（2人対戦モード）
   $('hud-top').querySelector('span:nth-child(2)')!.textContent = '白';   // 上=白（下=黒）
+  $('hud-bottom').querySelector('span:nth-child(2)')!.textContent = '黒';
   document.body.classList.remove('online-game');
   state.board = initialBoard(); lastMoves = [];
   show('game'); layoutBoard(); drawAll({ legal: true });
