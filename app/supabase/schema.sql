@@ -227,8 +227,8 @@ begin
   values (me, p_opp_user, p_mode, p_ai_level, p_result,
     p_black_count, p_white_count, p_moves, coalesce(p_moves_svg,''), uid_hash, gain);
 
-  select xp, level, wins, losses, draws, streak, best_streak
-    into xp, lv, w, l, d, st, bs from oth_profiles where id = me for update;
+  select p.xp, p.level, p.wins, p.losses, p.draws, p.streak, p.best_streak
+    into xp, lv, w, l, d, st, bs from oth_profiles p where p.id = me for update;
   if xp is null then
     insert into oth_profiles (id, display_name) values (me, '名無し')
       on conflict do nothing;

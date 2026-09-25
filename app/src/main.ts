@@ -100,8 +100,13 @@ function drawAll(opts: { legal?: boolean } = {}): void {
   // AI思考中は盤面上に透過オーバーレイで表示（盤外HUDには出さない）
   $('hud-turn').textContent = gameStatus(state.board) === 'over' ? '対局終了' : '';
   const meOn = state.board.turn === state.humanStone;
-  document.querySelector('.hud-me')?.classList.toggle('turn-on', meOn && !state.thinking && gameStatus(state.board) !== 'over');
-  document.querySelector('.hud-opp')?.classList.toggle('turn-on', !meOn && !state.thinking && gameStatus(state.board) !== 'over');
+  // 手番は【アイコンの外側エリア（対戦者バー全体）】の枠+背景色で強調
+  const meBar = document.querySelector('.hud-me')?.closest('footer') ?? null;
+  const oppBar = document.querySelector('.hud-opp')?.closest('header') ?? null;
+  const live = gameStatus(state.board) !== 'over';
+  meBar?.classList.toggle('turn-side', Boolean(live && meOn && !state.thinking));
+  oppBar?.classList.toggle('turn-side', Boolean(live && !meOn && !state.thinking));
+  if (state.thinking) oppBar?.classList.add('turn-side');
   $('think-overlay').classList.toggle('show', state.thinking);
 }
 

@@ -143,11 +143,6 @@ header, footer {
   padding: 26px 30px; text-align: center; box-shadow: 0 0 34px #ffd86b44; }
 .modal-title { font-size: 16px; margin-bottom: 18px; }
 .modal-actions { display: flex; gap: 10px; }
-.wait-toggle { display: flex; gap: 8px; align-items: center; font-size: 13px; color: #8fa3c8; margin-bottom: 10px; cursor: pointer; }
-.wait-toggle input { appearance: none; width: 40px; height: 22px; border-radius: 999px; background: #1e2a45; position: relative; transition: background .2s; }
-.wait-toggle input::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #8fa3c8; transition: transform .2s; }
-.wait-toggle input:checked { background: #16e0ff55; }
-.wait-toggle input:checked::after { transform: translateX(18px); background: var(--accent); }
 .lobby-row .challenge { padding: 4px 12px; font-size: 12px; border: 1px solid var(--accent); border-radius: 999px; color: var(--accent); }
 .lobby { max-height: 52dvh; }
 .resign { display: none; position: fixed; top: max(10px, env(safe-area-inset-top)); right: 10px; z-index: 40;
@@ -216,8 +211,6 @@ body.online-game .resign { display: block; }
 .lv-name { font-size: 17px; }
 
 /* ---- 設定画面: 大型トグル & 大スウォッチ ---- */
-.wait-toggle { font-size: 17px; gap: 12px; padding: 10px 0; }
-.wait-toggle input[type="checkbox"] { width: 28px; height: 28px; accent-color: #1de5ff; cursor: pointer; }
 .pickers { gap: 14px; }
 .pick { font-size: 17px; gap: 14px; }
 .pick input[type="color"] { width: 58px; height: 40px; border-radius: 10px; border: 1px solid #2a3a5f; cursor: pointer; }
@@ -228,15 +221,6 @@ body.online-game .resign { display: block; }
 /* ===== v0.5.0 ===== */
 
 /* トグル崩れ修正: ネオンcapabilityスイッチ型デザイン */
-.wait-toggle { position: relative; display: flex; align-items: center; font-size: 17px; gap: 14px; padding: 12px 0; }
-.wait-toggle input[type="checkbox"] { appearance: none; -webkit-appearance: none; position: relative;
-  width: 58px; height: 32px; border-radius: 999px; background: #0b1428; border: 1px solid #2a3a5f;
-  cursor: pointer; transition: background .18s, border-color .18s; flex: none; margin: 0; }
-.wait-toggle input[type="checkbox"]::after { content: ''; position: absolute; top: 3px; left: 3px;
-  width: 24px; height: 24px; border-radius: 50%; background: #6f83ad; transition: left .18s, background .18s, box-shadow .18s; }
-.wait-toggle input[type="checkbox"]:checked { background: linear-gradient(95deg,#00c8e0,#5c7bff); border-color: transparent; }
-.wait-toggle input[type="checkbox"]:checked::after { left: 29px; background: #fff; box-shadow: 0 0 10px rgba(0,220,255,.8); }
-
 /* プレイ画面: サウンド/一時停止を右上の独立エリアに（対戦者エリアと分離） */
 .hud-actions { position: fixed; top: max(10px, env(safe-area-inset-top)); right: 10px; display: flex; gap: 8px; z-index: 45; }
 .hud-actions .hud-btn { width: 46px; height: 46px; }
@@ -279,16 +263,16 @@ body.online-game .resign { display: block; }
 #preset-grid .lv-card { padding: 10px 6px; gap: 6px; }
 
 /* トグル: ポッチ（ノブ）が枠内に収まるよう比率指定で確定 */
-.wait-toggle input[type="checkbox"] { width: 56px; height: 30px; border-radius: 999px; }
-.wait-toggle input[type="checkbox"]::after { width: 22px; height: 22px; top: 3px; left: 3px; }
-.wait-toggle input[type="checkbox"]:checked::after { left: 31px; }   /* 56-22-3 の内側に収める */
+/* 56-22-3 の内側に収める */
 
 /* ===== ゲーム: 手番強調・思考オーバーレイ・手数非表示 ===== */
 .hud-stone { transition: box-shadow .18s, transform .18s; }
 .hud-stone.turn-on { box-shadow: 0 0 14px #7df9ff, 0 0 32px #7df9ff88; transform: scale(1.22); }
 
 #think-overlay { position: absolute; inset: 0; display: none; place-items: center;
-  color: #bfefff; font-size: 17px; letter-spacing: .08em; pointer-events: none;
+  color: #bfefff; letter-spacing: .08em; pointer-events: none;
+  font-size: clamp(24px, 7vw, 34px); font-weight: 800;
+  text-shadow: 0 0 18px rgba(0,240,255,.6);
   background: rgba(7, 12, 28, .35); backdrop-filter: blur(1.5px); }
 #think-overlay.show { display: grid; }
 #board-stage { position: relative; }
@@ -298,3 +282,30 @@ body.online-game .resign { display: block; }
 
 /* 結果詳細: 大型化 */
 #result-detail { font-size: 19px; color: #cfe0ff; font-weight: 700; }
+
+/* ===== v0.8.0: 設定エリア幅80% + テーマボタンの可変グリッド ===== */
+body #screen-settings { width: 82% !important; max-width: 560px !important; margin-inline: auto !important; }
+#screen-settings .pickers, #screen-settings .hint { width: 100%; }
+#preset-grid { grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); }
+
+/* ===== v0.8.0 トグル: 1から再設計（ポッチ絶対に枠内） ===== */
+.toggle-row { display: flex; align-items: center; gap: 16px; font-size: 17px; padding: 10px 0; }
+.toggle-row .sw { position: relative; display: inline-block; width: 62px; height: 34px; flex: none; }
+.toggle-row .sw input { appearance: none; -webkit-appearance: none; margin: 0; position: absolute; inset: 0;
+  border-radius: 999px; background: #14203a; border: 2px solid #2a3a5f; cursor: pointer; transition: background .18s, border-color .18s; }
+.toggle-row .sw input::after { content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px;
+  border-radius: 50%; background: #8fa3c8; transition: transform .18s cubic-bezier(.5,1.6,.5,1), background .18s; }
+.toggle-row .sw input:checked { background: linear-gradient(95deg, #00c8e0, #5c7bff); border-color: transparent; }
+.toggle-row .sw input:checked::after { transform: translateX(28px); background: #fff; box-shadow: 0 0 12px rgba(0,220,255,.9); }
+
+/* ===== 手番強調: 対戦者バー全体の枠+背景 ===== */
+header.turn-side, footer.turn-side {
+  border-color: #7df9ff;
+  background: linear-gradient(135deg, #123157dd, #2b1c58dd);
+  box-shadow: 0 0 20px #7df9ff55, inset 0 0 18px #7df9ff22;
+}
+header, footer { transition: border-color .18s, background .18s, box-shadow .18s; }
+
+/* AI思考オーバーレイ: 文字を大きく */
+#think-overlay { font-size: clamp(24px, 7vw, 34px); font-weight: 800; letter-spacing: .1em;
+  color: #eaffff; text-shadow: 0 0 18px rgba(0,240,255,.6); }
