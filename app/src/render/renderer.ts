@@ -10,6 +10,8 @@ export interface StoneTheme {
   grid: string;
   blackIcon?: HTMLImageElement | null;  // アイコン石（オプトイン）
   whiteIcon?: HTMLImageElement | null;
+  markerRing?: number;   // 合法手マーカー外枠の不透明度 (0〜1, 既定 0.9)
+  markerDot?: number;    // 合法手マーカー中心ドットの不透明度 (0〜1, 既定 1.0)
 }
 
 export const NEON_DEFAULT: StoneTheme = {
@@ -98,10 +100,12 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
       }
     }
     // めくり中の返される石は「返り先の手番側」に描かれている（applyMove後の盤面＋flippedCells指定）
-    // 合法手マーカー（視認性: 外リング＋明るい芯の二重構造・テーマ依存しない明度で統一）
+    // 合法手マーカー（外枠=現在のテーマ色/手番石色。不透明度はテーマ設定で調整可）
     if (o.legal) {
       const lm = legalBB(board.bb, board.turn);
-      const ringColor = board.turn === BLACK ? '#4de3ff' : '#ff7bff';   // 手番石と同系だが高明度・高不透明
+      const ringColor = board.turn === BLACK ? theme.black : theme.white;
+      const ringA = theme.markerRing ?? 0.9;
+      const dotA = theme.markerDot ?? 1.0;
       let m = lm;
       while (m !== 0n) {
         const i = leastBitIndex(m); m &= m - 1n;
@@ -110,10 +114,10 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
         // 外リング（太め・不透明）
         ctx.beginPath(); ctx.arc(cx, cy, cell * 0.30, 0, Math.PI * 2);
         ctx.strokeStyle = ringColor; ctx.lineWidth = Math.max(2.5, cell * 0.045);
-        ctx.globalAlpha = 0.9; ctx.stroke();
+        ctx.globalAlpha = ringA; ctx.stroke();
         // 芯（白ドット・視認の核）
         ctx.beginPath(); ctx.arc(cx, cy, cell * 0.10, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffffff'; ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.globalAlpha = dotA; ctx.fill();
         ctx.globalAlpha = 1;
       }
     }

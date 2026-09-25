@@ -1,8 +1,8 @@
 {
   "project": "NEON OTHELLO",
-  "updated_at": "2026-09-26 09:10 JST",
-  "phase": "v0.9.0 公開完了",
-  "status": "blocked_on_user",
-  "note": "ラウンド7: 終了画面ボタン大型、stats guard RPC許可(app.oth_rpc フラグ)、騎手アイコン右にユーザ名(hud-me-name/hud-opp-name)。【ユーザー操作待ち】SQL fix_stats_guard.sql の実行が必要",
-  "done": ["v0.1-0.8 機能/UI刷新", "v0.9.0 名前表示+保存修正SQL"]
+  "updated_at": "2026-09-26 11:30 JST",
+  "phase": "v1.0.0 公開完了",
+  "status": "done",
+  "note": "ラウンド8: 合法手マーカー二重リング+白芯で視認性統一、2人対戦名=プレイヤー1/2、設定幅94%+全画面スクロール、アイコン石注意文言削除。CI成功・本番v1.0.0確認済",
+  "done": ["v0.1-0.9 機能/UI刷新/保存修正", "v1.0.0 視認性+設定幅改修"]
 }

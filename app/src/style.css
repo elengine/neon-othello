@@ -315,3 +315,8 @@ header, footer { transition: border-color .18s, background .18s, box-shadow .18s
 
 /* ===== v0.9.0 終了画面ボタン大型化 ===== */
 .result-card .btn { min-width: min(280px, 74vw); padding: 14px 32px; font-size: 19px; font-weight: 800; border-radius: 999px; }
+
+/* ===== v1.1.0: テーマ名折り返し禁止 + マーカースライダー */
+.lv-card .lv-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.mkv { min-width: 4.2em; text-align: right; color: var(--gold); font-size: 15px; font-weight: 800; }
+.pick input[type="range"] { width: 120px; accent-color: #1de5ff; }

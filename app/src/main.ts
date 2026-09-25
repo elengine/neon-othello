@@ -41,14 +41,18 @@ type PaceMode = 'normal' | 'slow' | 'fast' | 'jitter';
 const Prefs = {
   pace: 'jitter' as PaceMode,   // デフォルトはゆらぎ
   sound: true,
+  mkRing: 0.9,                  // マーカー外枠の不透明度 (0.1〜1)
+  mkDot: 1.0,                   // マーカー中心ドットの不透明度
 };
 const PACE_KEY = 'otv2:prefs';
-function savePrefs(): void { try { localStorage.setItem(PACE_KEY, JSON.stringify({ pace: Prefs.pace, sound: Prefs.sound })); } catch { /* 非対応環境 */ } }
+function savePrefs(): void { try { localStorage.setItem(PACE_KEY, JSON.stringify({ pace: Prefs.pace, sound: Prefs.sound, mkRing: Prefs.mkRing, mkDot: Prefs.mkDot })); } catch { /* 非対応環境 */ } }
 function loadPrefs(): void {
   try {
     const raw = JSON.parse(localStorage.getItem(PACE_KEY) ?? '{}');
     if (raw.pace) Prefs.pace = raw.pace;
     if (typeof raw.sound === 'boolean') Prefs.sound = raw.sound;
+    if (typeof raw.mkRing === 'number') Prefs.mkRing = raw.mkRing;
+    if (typeof raw.mkDot === 'number') Prefs.mkDot = raw.mkDot;
   } catch { /* 破損時は既定 */ }
 }
 
@@ -280,6 +284,8 @@ function playSound(kind: string, n = 1): void {
 // ---- 石色テーマ ----
 function applyTheme(): void {
   state.theme = state.themeName === 'classic' ? CLASSIC : NEON_DEFAULT;
+  state.theme.markerRing = Prefs.mkRing;
+  state.theme.markerDot = Prefs.mkDot;
   document.documentElement.style.setProperty('--stone-black', state.theme.black);
   document.documentElement.style.setProperty('--stone-white', state.theme.white);
   renderer = makeRenderer($('board') as unknown as HTMLCanvasElement, state.theme);
@@ -287,6 +293,7 @@ function applyTheme(): void {
 
 async function setPref(black: string, white: string, glow: string, boardBg: string, iconOn: boolean): Promise<void> {
   const th = prefToTheme({ black, white, glow, boardBg });
+  th.markerRing = Prefs.mkRing; th.markerDot = Prefs.mkDot;
   if (iconOn && currentProfile()?.avatar_url) {
     const im = await loadImage(currentProfile()!.avatar_url!);
     // 自分の石（黒側=先手想定）にアイコン。相手のアイコンはオンライン時のみ他モジュールで設定
@@ -448,6 +455,23 @@ export function boot(): void {
   loadPrefs();
   paintPace();
   soundChk.checked = Prefs.sound;
+
+  // マーカー不透明度スライダー（即反映・永続・%表示更新）
+  const mkR = $('mk-ring') as unknown as HTMLInputElement, mkD = $('mk-dot') as unknown as HTMLInputElement;
+  mkR.value = String(Math.round(Prefs.mkRing * 100));
+  mkD.value = String(Math.round(Prefs.mkDot * 100));
+  ($('mk-ring-v') as HTMLElement).textContent = `${Math.round(Prefs.mkRing * 100)}%`;
+  ($('mk-dot-v') as HTMLElement).textContent = `${Math.round(Prefs.mkDot * 100)}%`;
+  const applyMk = () => {
+    Prefs.mkRing = Number(mkR.value) / 100; Prefs.mkDot = Number(mkD.value) / 100;
+    ($('mk-ring-v') as HTMLElement).textContent = `${mkR.value}%`;
+    ($('mk-dot-v') as HTMLElement).textContent = `${mkD.value}%`;
+    state.theme.markerRing = Prefs.mkRing; state.theme.markerDot = Prefs.mkDot;
+    makeRenderer($('board') as unknown as HTMLCanvasElement, state.theme);
+    drawAll();
+    savePrefs();
+  };
+  mkR.addEventListener('input', applyMk); mkD.addEventListener('input', applyMk);
   setSound(Prefs.sound);   // 初期化時: 端末保存値を音の実体へ
   ($('btn-mute') as HTMLElement).textContent = Prefs.sound ? '🔊' : '🔇';
 

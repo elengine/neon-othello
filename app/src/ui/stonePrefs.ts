@@ -7,7 +7,7 @@ export interface StonePref { black: string; white: string; glow: string; boardBg
 
 export const PRESETS: { name: string; pref: StonePref }[] = [
   { name: 'ネオン', pref: { black: '#16e0ff', white: '#ff3df5', glow: '#7df9ff', boardBg: '#0c1322' } },
-  { name: '定番 黒白', pref: { black: '#111318', white: '#f2f4f8', glow: '#8ea0c0', boardBg: '#123524' } },
+  { name: '黑白', pref: { black: '#111318', white: '#f2f4f8', glow: '#8ea0c0', boardBg: '#123524' } },
   { name: 'サンセット', pref: { black: '#ff9e42', white: '#7c5cff', glow: '#ffd86b', boardBg: '#171126' } },
   { name: '和モダン', pref: { black: '#1f2430', white: '#e8ddc8', glow: '#c9a86a', boardBg: '#22303a' } },
   { name: 'パステル', pref: { black: '#8fb8ff', white: '#ffd1e8', glow: '#c5e0ff', boardBg: '#20263a' } },
