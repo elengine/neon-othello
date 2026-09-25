@@ -37,7 +37,35 @@ const state = {
   themeName: 'neon' as 'neon' | 'classic' | 'custom',
 };
 
+type PaceMode = 'normal' | 'slow' | 'fast' | 'jitter';
+const Prefs = {
+  pace: 'normal' as PaceMode,
+  sound: true,
+};
+const PACE_KEY = 'otv2:prefs';
+function savePrefs(): void { try { localStorage.setItem(PACE_KEY, JSON.stringify({ pace: Prefs.pace, sound: Prefs.sound })); } catch { /* 非対応環境 */ } }
+function loadPrefs(): void {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PACE_KEY) ?? '{}');
+    if (raw.pace) Prefs.pace = raw.pace;
+    if (typeof raw.sound === 'boolean') Prefs.sound = raw.sound;
+  } catch { /* 破損時は既定 */ }
+}
+
 let renderer: ReturnType<typeof makeRenderer>;
+let paused = false;
+
+function setPaused(on: boolean): void {
+  paused = on;
+  $('overlay-pause').classList.toggle('show', on);
+  $('btn-pause').textContent = on ? '▶' : '⏸';
+  if (on) cancelAI();               // AI思考待ちを停止（再開時に再スケジュール）
+  else if (state.screen === 'game' && state.board.turn !== state.humanStone
+           && gameStatus(state.board) === 'playing' && !aiTimer) { void scheduleAIReturn(); }
+}
+
+function scheduleAIReturn(): void { scheduleAI(); }  // 再開時のAI再開（AI手番のときだけここに到達）
+
 
 function show(s: Screen): void {
   state.screen = s;
@@ -72,7 +100,7 @@ function drawAll(opts: { legal?: boolean } = {}): void {
 }
 
 function onBoardTap(ev: PointerEvent): void {
-  if (state.screen !== 'game' || state.thinking || gameStatus(state.board) === 'over') return;
+  if (paused || state.screen !== 'game' || state.thinking || gameStatus(state.board) === 'over') return;
   if (state.board.turn !== state.humanStone) return;
   const canvas = $('board') as unknown as HTMLCanvasElement;
   const cell = renderer.cellAt(ev.clientX, ev.clientY, canvas.getBoundingClientRect());
@@ -132,10 +160,24 @@ function startTurnTimer(): void {
 }
 function stopTurnTimer(): void { if (state.oppTimeout) clearInterval(state.oppTimeout); state.oppTimeout = 0; }
 
+// ---- コンピュータの打つ速度（普通/遅い/早い/ゆらぎ）----
+const PACE_MS: Record<PaceMode, [number, number]> = {
+  normal: [500, 900], slow: [1500, 2400], fast: [120, 260], jitter: [300, 2600],
+};
+function aiDelay(): number {
+  const [lo, hi] = PACE_MS[Prefs.pace];
+  return Prefs.pace === 'jitter'
+    ? Math.round(lo + Math.pow(Math.random(), 2.6) * (hi - lo))  // 秒級まで伸びる悩み
+    : Math.round(lo + Math.random() * (hi - lo));
+}
+let aiTimer = 0;
+function cancelAI(): void { if (aiTimer) { clearTimeout(aiTimer); aiTimer = 0; state.thinking = false; drawAll(); } }
+
 function scheduleAI(): void {
   state.thinking = true;
   drawAll();
-  setTimeout(() => {
+  aiTimer = setTimeout(() => {
+    aiTimer = 0;
     const m = aiMove(state.board, state.aiLevel);
     if (m.pass) {
       state.board = applyPass(state.board);
@@ -154,7 +196,7 @@ function scheduleAI(): void {
       state.pendingFlip = { cells: [], anim: 0, fromCell: -1 };
       checkTurn();
     });
-  }, 120);
+  }, aiDelay());
 }
 
 let lastMoves: number[] = [];
@@ -194,6 +236,7 @@ async function finishGame(): Promise<void> {
 
 // ---- SE（sfx.ts・ミュート永続設定追従） ----
 function playSound(kind: string, n = 1): void {
+  if (!Prefs.sound) return;   // 設定画面のサウンド設定を最優先
   if (kind === 'place') sfx.place();
   else if (kind === 'flip') sfx.flip(n);
   else if (kind === 'win') sfx.win();
@@ -324,6 +367,9 @@ export function boot(): void {
   });
   $('btn-again').addEventListener('click', () => { state.board = initialBoard(); lastMoves = []; show('game'); layoutBoard(); drawAll({ legal: true }); });
   $('btn-result-title').addEventListener('click', () => show('title'));
+  $('btn-pause').addEventListener('click', () => setPaused(!paused));
+  $('btn-resume').addEventListener('click', () => setPaused(false));
+  $('btn-quit').addEventListener('click', () => { setPaused(false); show('result'); $('result-text').textContent = '終了'; $('result-detail').textContent = '中断しました'; $('result-xp').textContent = '未保存'; });
   ($('btn-mute') as HTMLElement).addEventListener('click', (e) => {
     const m = toggleMute();
     (e.currentTarget as HTMLElement).textContent = m ? '🔇' : '🔊';
@@ -353,6 +399,28 @@ export function boot(): void {
     const c = (e.target as HTMLInputElement);
     setPref(cpB.value, cpW.value, state.theme.glow, state.theme.boardBg, c.checked);
   });
+
+  // コンピュータの打つ速度（普通/遅い/早い/ゆらぎ）
+  const paceRow = $('pace-row');
+  const paintPace = () => paceRow.querySelectorAll('.pace-btn').forEach((x) =>
+    x.classList.toggle('picked', (x as HTMLElement).dataset.pace === Prefs.pace));
+  paceRow.querySelectorAll('.pace-btn').forEach((el) => el.addEventListener('click', () => {
+    Prefs.pace = ((el as HTMLElement).dataset.pace ?? 'normal') as PaceMode;
+    savePrefs(); paintPace();
+  }));
+
+  // サウンド（即プレイへ反映・永続）
+  const soundChk = $('chk-sound') as unknown as HTMLInputElement;
+  soundChk.addEventListener('change', () => {
+    Prefs.sound = soundChk.checked;
+    savePrefs();
+    ($('btn-mute') as HTMLElement).textContent = Prefs.sound ? '🔊' : '🔇';
+  });
+  loadPrefs();
+  paintPace();
+  soundChk.checked = Prefs.sound;
+
+  // タイトルのグローアニメ（ネオンテトリス風: neonPulse/ctaGlow はCSS実装、ここでは picked 状態の初期復元のみ）
 
   window.addEventListener('resize', () => { if (state.screen === 'game') layoutBoard(); });
   screen.orientation?.addEventListener?.('change', () => setTimeout(() => { if (state.screen === 'game') layoutBoard(); }, 120));

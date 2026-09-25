@@ -1,8 +1,8 @@
 {
   "project": "NEON OTHELLO",
-  "updated_at": "2026-09-25 09:15 JST",
-  "phase": "公開完了",
+  "updated_at": "2026-09-25 10:25 JST",
+  "phase": "v0.2.0 公開完了",
   "status": "done",
-  "note": "全フェーズ完了。GitHub Pages公開（Actions CI success・本番ビルドにSupabase設定同梱確認済）。URL=https://elengine.github.io/neon-othello/",
-  "done": ["P1 スキャフォールド", "P2a ルールエンジン", "P2b AI Lv1-5", "P2c 盤面UI", "P3 認証/ランキング/レベル演出/アイコン石/カラーピッカー", "P4 オンライン対戦", "P5 PWA/フォント最適化/Fold8", "CI/CD デプロイ", "QR配布"]
+  "note": "一時停止/再開/ゲーム終了UI、AI思考揺らぎ+打つ速度4設定(普通/遅い/早い/ゆらぎ)、設定にサウンド、タイトルグローアニメ(ネオンテトリス風)、ランキング実績ゼロ除外。CI成功・本番bundle v0.2.0確認済",
+  "done": ["v0.1.0 全機能", "v0.2.0 UI改修一式", "fix_login.sql(既存ユーザープロフィール)", "ランキング実績ゼロ除外"]
 }
