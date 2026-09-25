@@ -1,8 +1,8 @@
 {
   "project": "NEON OTHELLO",
-  "updated_at": "2026-09-24 15:35 JST",
-  "phase": "P2c 盤面UI",
-  "status": "completed",
-  "note": "AI対戦が縦/横どちらでも実プレイ可能であることをCDP自動操作+スクショ解析で検証済み。次: P3（Supabase Auth移植・DB SQL・XP/レベル・ランキング・賑やかし演出）",
-  "done": ["P1 スキャフォールド", "P2a ルールエンジン", "P2b AI Lv1-5(テスト14/14)", "P2c 盤面UI(回転レスポンシブ検証済)", "v1.0 文書PDF", "Moralerspace Neon同梱(woff2)"]
+  "updated_at": "2026-09-25 01:30 JST",
+  "phase": "P1〜P5 実装完了 / ユーザー操作待ちでデプロイ未実施",
+  "status": "blocked_on_user",
+  "note": "コード実装・テスト・CDP検証すべて完了（v0.1.0コミット済）。残はユーザー操作2点: (1) Supabase SQL Editorで app/supabase/schema.sql 実行 (2) GitHub PAT（期限切れのため再発行）でリポジトリ neon-othello 作成→push→Pages有効化→Actionsシークレット2件設定→QR配布",
+  "done": ["P1", "P2a", "P2b", "P2c", "P3a(SQL)", "P3b(Auth)", "P3c(戦績/ランキング/演出)", "P3d(石色/アイコン石)", "P4(オンライン実装・実サーバー接続テストはSQL実行後)", "P5(PWA/フォント1.7MB化/検証)"]
 }
