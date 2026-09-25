@@ -103,7 +103,9 @@ function drawAll(opts: { legal?: boolean } = {}): void {
 
 function onBoardTap(ev: PointerEvent): void {
   if (paused || state.screen !== 'game' || state.thinking || gameStatus(state.board) === 'over') return;
-  if (state.board.turn !== state.humanStone) return;
+  if (state.mode !== 'ai' || state.aiLevel !== 0) {
+    if (state.board.turn !== state.humanStone) return;   // 2人対戦以外: 自分の手番のみ
+  }
   const canvas = $('board') as unknown as HTMLCanvasElement;
   const cell = renderer.cellAt(ev.clientX, ev.clientY, canvas.getBoundingClientRect());
   if (cell === null) return;
@@ -142,6 +144,7 @@ function checkTurn(): void {
     if (gameStatus(state.board) === 'over') { finishGame(); return; }
   }
   if (state.mode === 'online') { startTurnTimer(); return; } // AI禁止・相手待ちタイマー
+  if (state.aiLevel === 0) return;                          // 2人対戦: 交代で両者タップ
   if (state.board.turn !== state.humanStone) scheduleAI();
 }
 
@@ -206,7 +209,10 @@ let lastMoves: number[] = [];
 async function finishGame(): Promise<void> {
   const w = winner(state.board);
   const { black, white } = stoneCount(state.board);
-  const text = w === 'draw' ? '引き分け' : (w === state.humanStone ? 'あなたの勝ち！' : 'AIの勝ち');
+  const localMode = state.mode === 'ai' && state.aiLevel === 0;
+  const text = w === 'draw' ? '引き分け'
+    : localMode ? (w === BLACK ? '黒の勝ち！' : '白の勝ち！')
+    : (w === state.humanStone ? 'あなたの勝ち！' : 'AIの勝ち');
   $('result-text').textContent = text;
   $('result-detail').textContent = `黒 ${black} — 白 ${white}（全${state.board.moveCount}手）`;
   show('result');
@@ -342,7 +348,7 @@ export function boot(): void {
       if (sec >= 60) { clearInterval(iv); if (isOnlinePlaying()) { await endMatch(); finishGame(); } }
     }, 1000);
   };
-  $('btn-local').addEventListener('click', () => toast('ローカル2人対戦はP3で実装予定'));
+  $('btn-local').addEventListener('click', startLocal);
   $('btn-settings').addEventListener('click', () => show('settings'));
   $('btn-ranking').addEventListener('click', () => show('ranking'));
   $('btn-login').addEventListener('click', () => currentProfile() ? void logout().then(refreshChrome) : loginWithGoogle());
@@ -351,12 +357,7 @@ export function boot(): void {
 
   for (const lv of [1, 2, 3, 4, 5]) {
     const card = document.querySelector(`[data-level="${lv}"]`);
-    card?.addEventListener('click', () => {
-      state.aiLevel = lv; state.humanStone = BLACK; state.mode = 'ai';
-      document.body.classList.remove('online-game');
-      state.board = initialBoard(); lastMoves = [];
-      show('game'); layoutBoard(); drawAll({ legal: true });
-    });
+    card?.addEventListener('click', () => startAI(lv));
   }
 
   $('board').addEventListener('pointerdown', onBoardTap as EventListener);
@@ -438,6 +439,21 @@ export function boot(): void {
     refreshChrome();
     if (s) { void restorePref(); void initOnline(); }
   });
+}
+
+// ---- 対局開始 ----
+function startAI(lv: number): void {
+  state.mode = 'ai'; state.aiLevel = lv; state.humanStone = BLACK;
+  document.body.classList.remove('online-game');
+  state.board = initialBoard(); lastMoves = [];
+  show('game'); layoutBoard(); drawAll({ legal: true });
+}
+
+function startLocal(): void {
+  state.mode = 'ai'; state.aiLevel = 0;    // aiLevel=0 = AI不出現（2人対戦モード）
+  document.body.classList.remove('online-game');
+  state.board = initialBoard(); lastMoves = [];
+  show('game'); layoutBoard(); drawAll({ legal: true });
 }
 
 function refreshChrome(): void {
