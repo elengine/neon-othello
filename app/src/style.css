@@ -82,8 +82,9 @@ header, footer {
 #pass-toast {
   position: fixed; left: 50%; bottom: 18dvh; transform: translate(-50%, 20px);
   background: #000c; border: 1px solid var(--accent); color: var(--accent);
-  padding: 10px 22px; border-radius: 999px; opacity: 0; pointer-events: none;
-  transition: opacity .25s, transform .25s; z-index: 50; font-size: 15px;
+  padding: 12px 26px; border-radius: 999px; opacity: 0; pointer-events: none;
+  transition: opacity .25s, transform .25s; z-index: 50; font-size: 26px; font-weight: 700;
+  max-width: 92vw; text-align: center;
 }
 #pass-toast.show { opacity: 1; transform: translate(-50%, 0); }
 .result-card { display: flex; flex-direction: column; gap: 14px; align-items: center; margin-top: 14dvh;
