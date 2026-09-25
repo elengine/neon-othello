@@ -559,14 +559,18 @@ function refreshChrome(): void {
 }
 
 function renderLobby(list: Opponent[], me?: Opponent | null): void {
-  const meBar = $('lobby-me') as HTMLElement;
-  meBar.innerHTML = me
-    ? `<span class="lobby-you">あなたは待機中（他のプレイヤーの一覧に表示されています）</span>`
-    : '';
+  const on = Boolean(me);
+  const card = $('wait-card');
+  card?.classList.toggle('on', on);
+  const st = $('lobby-status') as HTMLElement;
+  st.className = 'lobby-status' + (on ? ' on' : '');
+  st.innerHTML = on
+    ? `<span class="ico">📡</span><span>ただいま待機中！ 相手からの招待をお待ちください</span><span class="pulse"></span>`
+    : `<span class="ico">💤</span><span>待機していません（ONにすると招待を受け取れます）</span>`;
   const ul = $('lobby-list');
   ul.innerHTML = '';
   if (list.length === 0) {
-    ul.innerHTML = '<li class="rank-loading">待機中のプレイヤーはまだいません。「待機中」をONにするとあなたも一覧に出ます</li>';
+    ul.innerHTML = `<li class="lobby-empty"><span class="big">🌙</span>いま 待機中のプレイヤーは<br>いません</li>`;
     return;
   }
   for (const o of list) {
@@ -577,9 +581,10 @@ function renderLobby(list: Opponent[], me?: Opponent | null): void {
       <span class="rank-num">${o.wins}勝${o.losses}敗</span>
       <button class="btn btn-ghost challenge">挑戦</button>`;
     li.querySelector('.challenge')!.addEventListener('click', async (e) => {
-      (e.target as HTMLElement).textContent = '…';
-      const st = await invite(o);
-      (e.target as HTMLElement).textContent = st === 'sent' ? '招待送信中' : 'もう待機していません';
+      const btn = e.target as HTMLButtonElement;
+      btn.disabled = true; btn.textContent = '…';
+      const st2 = await invite(o);
+      btn.textContent = st2 === 'sent' ? '招待送信中' : 'もう待機していません';
     });
     ul.appendChild(li);
   }

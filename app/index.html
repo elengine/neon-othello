@@ -83,9 +83,13 @@
       <section id="screen-lobby" class="screen">
         <button id="back-lobby" class="back">← タイトル</button>
         <h2>対戦相手を探す</h2>
-        <label class="wait-toggle"><input type="checkbox" id="chk-wait"><span>他のプレイヤーに自分を表示（待機中）</span></label>
+        <label class="wait-card" id="wait-card">
+          <span class="wait-card-text"><b>待機する</b><small>待機中は他のプレイヤーの一覧に表示されます</small></span>
+          <span class="sw"><input type="checkbox" id="chk-wait"></span>
+        </label>
+        <div id="lobby-status" class="lobby-status"></div>
         <ul id="lobby-list" class="rank-list lobby"></ul>
-        <div id="lobby-me" class="rank-me"></div>
+        <div class="lobby-foot">一覧は約2秒ごとに自動更新されます</div>
       </section>
 
       <!-- S5 招待モーダル -->
