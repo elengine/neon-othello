@@ -27,7 +27,7 @@ body {
 .screen { display: none; height: 100%; flex-direction: column; align-items: center; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
 .screen.active { display: flex; }
 .logo { font-size: clamp(34px, 9vw, 64px); line-height: 1.05; text-align: center; margin: 8dvh 0 0;
-  color: var(--accent); text-shadow: 0 0 18px #16e0ff88, 0 0 42px #ff3df555; letter-spacing: .04em; }
+  color: var(--accent); letter-spacing: .04em; }   /* グローは neonPulse アニメ一本化（多重付与の解消） */
 .version { color: #8fa3c8; font-size: 12px; letter-spacing: .2em; margin: 6px 0 24px; }
 .menu { display: flex; flex-direction: column; gap: 12px; width: min(340px, 86vw); }
 .btn {
@@ -57,12 +57,12 @@ h2 { color: var(--gold); font-size: 20px; font-weight: 400; margin: 12px 0 18px;
 header, footer {
   display: flex; align-items: center; gap: 12px; justify-content: center;
   background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
-  padding: 8px 20px; min-height: 44px; font-size: 15px;
+  padding: 10px 22px; min-height: 52px; font-size: 17px;   /* プレイヤー表示部を拡大 */
 }
-.hud-stone { width: 18px; height: 18px; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #7df9ff66; }
+.hud-stone { width: 22px; height: 22px; border-radius: 50%; display: inline-block; box-shadow: 0 0 10px #7df9ff88; }
 .hud-me { background: var(--stone-black); }
 .hud-opp { background: var(--stone-white); }
-.count { font-size: 18px; color: var(--gold); min-width: 2ch; text-align: center; }
+.count { font-size: 21px; color: var(--gold); min-width: 2ch; text-align: center; font-weight: 800; }
 #board-stage {
   flex: 1; display: grid; place-items: center; width: 100%;
   min-height: 0;
@@ -157,13 +157,16 @@ body.online-game .resign { display: block; }
 .hint { color: #56688c; font-size: 11.5px; width: min(420px, 90vw); margin-top: 14px; line-height: 1.6; }
 #screen-settings { overflow-y: auto; }
 
-/* ---- 一時停止モーダル（テトリス風: 暗転+カード ポップアップ） ---- */
-.pause-overlay { position: fixed; inset: 0; display: none; place-items: center; background: rgba(4, 8, 20, 0.72); backdrop-filter: blur(6px); z-index: 80; }
-.pause-overlay.show { display: grid; }
-.pause-overlay::before { content: ''; position: absolute; inset: 0; } /* クリック封止 */
-.pause-title { position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); color: #8ff6ff; font-size: 30px; letter-spacing: 0.28em; text-shadow: 0 0 18px rgba(0,240,255,.75); margin: 0; }
-.pause-overlay .btn { position: relative; z-index: 1; min-width: 220px; margin: 10px 0; }
-.pause-overlay .btn:nth-of-type(1) { margin-top: 90px; }
+/* ---- 一時停止モーダル（テトリス風: 不透明グラデ全面 + 大型CTA縦積み） ---- */
+.pause-overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center;
+  padding: 24px; background: radial-gradient(ellipse at center, #0d1233 0%, #070b22 100%); z-index: 80; }
+.pause-overlay.show { display: flex; }
+.pause-title { color: #eaffff; font-size: clamp(30px, 9vw, 46px); font-weight: 900; letter-spacing: 0.12em; margin: 0 0 6px;
+  text-shadow: 0 0 22px rgba(0,240,255,.8), 0 0 60px rgba(200,107,255,.4); }
+.pause-sub { color: #8fb4ff; font-size: 15px; letter-spacing: 0.18em; margin: 0 0 30px; }
+.pause-overlay .btn { min-width: min(300px, 78vw); padding: 15px 40px; font-size: 19px; font-weight: 800; letter-spacing: 0.08em;
+  border-radius: 40px; margin: 9px 0; cursor: pointer; }
+.pause-overlay .btn.btn-ghost { font-size: 17px; }
 
 /* ---- 速度セグメントUI（洗練・ネオン） ---- */
 .pace-row { display: flex; gap: 8px; width: min(420px, 90vw); margin-top: 10px; }
@@ -179,8 +182,8 @@ body.online-game .resign { display: block; }
 /* ---- タイトル グローアニメ（neonPulse/ctaGlow @keyframes 定義） ---- */
 .logo { animation: neonPulse 3.2s ease-in-out infinite; }
 @keyframes neonPulse {
-  0%, 100% { filter: drop-shadow(0 0 16px rgba(0,240,255,.5)) drop-shadow(0 0 46px rgba(200,107,255,.3)); }
-  50% { filter: drop-shadow(0 0 30px rgba(0,240,255,.85)) drop-shadow(0 0 80px rgba(200,107,255,.55)); }
+  0%, 100% { filter: drop-shadow(0 0 18px rgba(0,240,255,.45)) drop-shadow(0 0 44px rgba(200,107,255,.25)); }
+  50% { filter: drop-shadow(0 0 26px rgba(0,240,255,.8)) drop-shadow(0 0 70px rgba(200,107,255,.5)); }
 }
 .menu .btn { animation: ctaGlow 2.6s ease-in-out infinite; }
 .menu .btn:nth-child(2) { animation-delay: 0.8s; }
@@ -189,3 +192,19 @@ body.online-game .resign { display: block; }
   50% { box-shadow: 0 10px 42px rgba(0,220,255,.68), 0 6px 24px rgba(160,90,255,.5); }
 }
 @media (prefers-reduced-motion: reduce) { .logo, .menu .btn { animation: none; } }
+
+/* ---- HUD右上アクション (一時停止/サウンド) ---- */
+.hud-spacer { flex: 1; }
+.hud-btn { background: #0e1830; border: 1px solid #1de5ff44; border-radius: 12px; color: #cfeaff;
+  font-size: 20px; width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer; flex: none; }
+.hud-btn:active { border-color: #1de5ff99; }
+.mute-btn { display: none; } /* 旧サウンド絵文字枠は削除（hud-btnに統合） */
+
+/* ---- 設定画面: 戻るボタンを大きく分かりやすく ---- */
+.back { align-self: flex-start; font-size: 17px; font-weight: 800; color: #8fd8ff;
+  background: #0e1830; border: 1px solid #1de5ff44; border-radius: 999px; padding: 10px 22px; cursor: pointer; }
+.back:active { border-color: #1de5ff99; }
+
+/* ---- 全般: 最小文字サイズ底上げ（小さすぎ箇所の統一） ---- */
+.hint, .hist-list li, .rank-me { font-size: 15px; }
+.lv-name { font-size: 17px; }

@@ -11,7 +11,7 @@ import gsap from 'gsap';
 import { initAuth, currentProfile, loginWithGoogle, logout, submitGame, titleFor, refreshProfile } from './supabase/auth';
 import { supabaseConfigured } from './supabase/client';
 import { celebrateLevelUp } from './ui/celebrate';
-import { sfx, toggleMute } from './audio/sfx';
+import { sfx, toggleMute, setSound } from './audio/sfx';
 import { renderRanking, renderHistory } from './ui/rankingView';
 import { initOnline, enterLobby, setWaiting, invite, isOnlinePlaying, onlineCB, setInviteHandler, endMatch, sendMove, sendPass, sendResign, saveSnapshot, type Opponent } from './net/online';
 import { encodeMoves } from './core/board';
@@ -369,9 +369,11 @@ export function boot(): void {
   $('btn-result-title').addEventListener('click', () => show('title'));
   $('btn-pause').addEventListener('click', () => setPaused(!paused));
   $('btn-resume').addEventListener('click', () => setPaused(false));
-  $('btn-quit').addEventListener('click', () => { setPaused(false); show('result'); $('result-text').textContent = '終了'; $('result-detail').textContent = '中断しました'; $('result-xp').textContent = '未保存'; });
+  $('btn-quit').addEventListener('click', () => { setPaused(false); stopTurnTimer(); cancelAI(); if (state.mode === 'online') { void endMatch(); document.body.classList.remove('online-game'); } state.board = initialBoard(); lastMoves = []; show('title'); });
   ($('btn-mute') as HTMLElement).addEventListener('click', (e) => {
     const m = toggleMute();
+    Prefs.sound = !m; savePrefs();   // 設定画面チェックと同期
+    ($('chk-sound') as unknown as HTMLInputElement).checked = !m;
     (e.currentTarget as HTMLElement).textContent = m ? '🔇' : '🔊';
   });
   $('back-rank').addEventListener('click', () => show('title'));
@@ -414,11 +416,14 @@ export function boot(): void {
   soundChk.addEventListener('change', () => {
     Prefs.sound = soundChk.checked;
     savePrefs();
+    setSound(Prefs.sound);   // 音の実体（Howler）へ即反映。HUD絵文字も同调用
     ($('btn-mute') as HTMLElement).textContent = Prefs.sound ? '🔊' : '🔇';
   });
   loadPrefs();
   paintPace();
   soundChk.checked = Prefs.sound;
+  setSound(Prefs.sound);   // 初期化時: 端末保存値を音の実体へ
+  ($('btn-mute') as HTMLElement).textContent = Prefs.sound ? '🔊' : '🔇';
 
   // タイトルのグローアニメ（ネオンテトリス風: neonPulse/ctaGlow はCSS実装、ここでは picked 状態の初期復元のみ）
 

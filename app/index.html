@@ -42,6 +42,8 @@
           <span class="hud-stone hud-opp"></span>
           <span>AI</span>
           <span class="count" id="hud-white-count">2</span>
+          <span class="hud-spacer"></span>
+          <button id="btn-mute" class="hud-btn" aria-label="音量切り替え">🔊</button>
           <button id="btn-pause" class="hud-btn" aria-label="一時停止">⏸</button>
         </header>
         <div id="board-stage"><canvas id="board"></canvas></div>
@@ -49,10 +51,10 @@
           <span class="hud-stone hud-me"></span>
           <span id="hud-turn">黒の番</span>
           <span class="count" id="hud-black-count">2</span>
-          <button id="btn-mute" class="mute-btn" aria-label="音量切り替え">🔊</button>
         </footer>
         <div id="overlay-pause" class="pause-overlay">
           <h2 class="pause-title">一時停止</h2>
+          <p class="pause-sub">PAUSED</p>
           <button id="btn-resume" class="btn">▶ 再開</button>
           <button id="btn-quit" class="btn btn-ghost">🚪 ゲーム終了</button>
         </div>

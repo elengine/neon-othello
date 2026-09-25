@@ -1,12 +1,18 @@
 // 効果音エンジン（WebAudio合成・著作権フリー・howlerハブ維持で将来ファイル音源に差し替え可）
 import { Howler } from 'howler';
 
-const MUTE_KEY = '***';
+const MUTE_KEY = 'otv2:sound_muted';   // ※ HUDミュートと設定画面チェックの共通ストア
 let muted = false;
 try { muted = localStorage.getItem(MUTE_KEY) === '1'; } catch { /* プライベートモード */ }
 Howler.mute(muted);
 
 export function isMuted(): boolean { return muted; }
+/** 設定画面/HUD のどちらからでも状態を一元に設定する（音と絵文字の共通ソース） */
+export function setSound(on: boolean): void {
+  muted = !on;
+  try { localStorage.setItem(MUTE_KEY, muted ? '1' : '0'); } catch { /* noop */ }
+  Howler.mute(muted);
+}
 export function toggleMute(): boolean {
   muted = !muted;
   try { localStorage.setItem(MUTE_KEY, muted ? '1' : '0'); } catch { /* noop */ }
