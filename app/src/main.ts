@@ -98,7 +98,7 @@ function drawAll(opts: { legal?: boolean } = {}): void {
   $('hud-white-count').textContent = over ? String(white) : '　';
   // 手番は騎手アイコンの光強調で示す（文言はなし）。
   // AI思考中は盤面上に透過オーバーレイで表示（盤外HUDには出さない）
-  if (gameStatus(state.board) === 'over') $('hud-me-name').textContent = '対局終了';
+  // ※終了時に hud-me-name を書き換えていたが、プレイヤー名が「対局終了」に化けるバグのため撤去（v1.5.1）。終了表示はリザルト画面が行う
   const meOn = state.board.turn === state.humanStone;
   // 手番は【アイコンの外側エリア（対戦者バー全体）】の枠+背景色で強調
   const meBar = document.querySelector('.hud-me')?.closest('footer') ?? null;
