@@ -31,12 +31,25 @@ describe('AI弱体化 v1.7.0', () => {
     console.log('Lv2 dist', [...dist.entries()].map(([k, v]) => `${k}:${v}`).join(' '));
     expect(dist.size).toBeGreaterThanOrEqual(2);
   });
-  it('Lv3は最適手に集中（低Lvより強い）', () => {
-    const dist = pickSet(3, 60);
-    const max = Math.max(...dist.values());
-    console.log('Lv3 top-ratio', max / 60);
-    expect(max / 60).toBeGreaterThan(0.8);
-  });
+  it('中盤局面でLv5(名人)は同一最善手に収束し、Lv3は揺らぎ/ポカで分散する', () => {
+    // 合法手を機械的に12手進めて非対称な中盤を作る
+    let b = initialBoard();
+    for (let k = 0; k < 12 && legalBB(b.bb, b.turn) !== 0n; k++) {
+      const x = legalBB(b.bb, b.turn);
+      b = applyMove(b, leastBitIndex(x)).board;
+    }
+    const pick = (lv: number, n: number) => {
+      const c = new Map<number, number>();
+      for (let i = 0; i < n; i++) { const m = aiMove(b, lv); c.set(m.cell, (c.get(m.cell) ?? 0) + 1); }
+      return c;
+    };
+    const d5 = pick(5, 15); const r5 = Math.max(...d5.values()) / 15;
+    const d3 = pick(3, 60);  const r3 = Math.max(...d3.values()) / 60;
+    console.log('midgame Lv5 top-ratio', r5, ' Lv3 top-ratio', r3);
+    expect(r5).toBeGreaterThan(0.6);            // 名人はほぼ単一最善
+    expect(r3).toBeLessThan(r5);                // 三段は揺らぎ0.2+ポカ10%でばらける
+    expect(d3.size).toBeGreaterThanOrEqual(2);
+  }, 120000);
   it('全Lvで実対戦進行（非法手なし・手詰まりまで）', () => {
     for (const lv of [1, 2]) {   // Lv3は重いので低Lvのみ
       let b = initialBoard();

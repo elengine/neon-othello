@@ -156,8 +156,8 @@ export interface AIProfile { depth: number; timeBudgetMs: number; randomness: nu
 export const AI_LEVELS: Record<number, AIProfile> = {
   1: { depth: 1, timeBudgetMs: 300, randomness: 1.5, blunderChance: 0.4 },  // 見習い（v1.7.0 弱化: 40%で完全ランダム手）
   2: { depth: 2, timeBudgetMs: 500, randomness: 0.4, blunderChance: 0.15 }, // 初段（v1.7.0 弱化: 1手読み+15%ポカ）
-  3: { depth: 5, timeBudgetMs: 1000, randomness: 0 },   // 三段
-  4: { depth: 7, timeBudgetMs: 1500, randomness: 0 },   // 有段
+  3: { depth: 4, timeBudgetMs: 1000, randomness: 0.2, blunderChance: 0.1 }, // 三段（v2.0.1 指定: 4手/揺らぎ0.2/ポカ10%）
+  4: { depth: 7, timeBudgetMs: 1500, randomness: 0, blunderChance: 0.05 },  // 有段（v2.0.1 指定: ポカ5%のみ）
   5: { depth: 9, timeBudgetMs: 2500, randomness: 0 },   // 名人
 };
 

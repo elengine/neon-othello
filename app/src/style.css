@@ -125,12 +125,19 @@ header, footer {
 .rank-me { color: var(--gold); font-size: 12px; padding: 6px 0; }
 .lobby-you { color: var(--gold); font-size: 15px; }
 /* ===== v2.0.0: ロビーUI刷新 ===== */
+/* ===== v2.0.1: 待機トグルの存在感向上（ON時グラデ・パルス発光・トグル大型化） ===== */
 .wait-card { display: flex; align-items: center; gap: 14px; width: min(560px, 94vw);
   background: linear-gradient(135deg,#101a33,#160f2e); border: 1.5px solid #2a3f6f; border-radius: 20px; padding: 14px 16px; margin: 4px 0 12px; }
-.wait-card.on { border-color: var(--stone-black); box-shadow: 0 0 22px #16e0ff33; }
+.wait-card.on { background: linear-gradient(120deg,#062c3a,#2a0f45); border-color: var(--stone-black); box-shadow: 0 0 26px #16e0ff44; }
 .wait-card-text { flex: 1; }
 .wait-card-text b { font-size: 19px; display: block; }
+.wait-card.on .wait-card-text b { color: var(--accent); text-shadow: 0 0 12px #16e0ff88; }
 .wait-card-text small { display: block; font-size: 13px; color: #8fa3c8; margin-top: 3px; line-height: 1.5; }
+#wait-card .sw { width: 74px; height: 42px; }
+#wait-card .sw input { min-width: 74px; min-height: 42px; background: #0c1428; border: 2.5px solid #3a4f7f; }
+#wait-card .sw input::after { top: 4px; left: 4px; width: 30px; height: 30px; }
+#wait-card .sw input:checked { background: linear-gradient(95deg,#00d0ff,#7b2bff); border-color: transparent; box-shadow: 0 0 18px rgba(0,220,255,.75); }
+#wait-card .sw input:checked::after { transform: translateX(32px); }
 .lobby-status { width: min(560px, 94vw); border-radius: 16px; padding: 12px 16px; font-size: 16.5px; font-weight: 700;
   margin-bottom: 10px; display: flex; gap: 10px; align-items: center; border: 1px solid #2a3f6f; background: #0b1428; color: #7c8fb5; }
 .lobby-status.on { background: linear-gradient(95deg,#062c3a,#251042); border-color: var(--stone-black); color: var(--accent); box-shadow: 0 0 14px #16e0ff22; }
@@ -358,9 +365,8 @@ header, footer { transition: border-color .18s, background .18s, box-shadow .18s
 .seg-btn.picked { background: linear-gradient(95deg,#00c8e0,#5c7bff); color: #fff; border-color: transparent;
   box-shadow: 0 0 16px rgba(0,220,255,.35); }
 #preset-grid .lv-name { font-size: 14px; }   /* 折り返し→省略から省略なしへ。小さくして全文表示（設定画面テーマカード限定） */
-/* ===== v2.0.0: AI強度選択 大型化 ===== */
-#screen-difficulty .levels { gap: 16px; width: min(560px, 94vw); grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-#screen-difficulty .lv-card { padding: 26px 12px; gap: 12px; border-radius: 18px; }
-#screen-difficulty .lv-name { font-size: 24px; font-weight: 800; }
-#screen-difficulty .lv-stars { font-size: 22px; letter-spacing: .14em; filter: drop-shadow(0 0 8px #ffd86b66); white-space: nowrap; }
-#screen-difficulty .lv-card:last-child { grid-column: 1 / -1; }  /* 5枚目(名人)は横いっぱいで対称に見せる */
+/* ===== v2.0.1: AI強度選択 — 名人を有段の右に（3列グリッド・span廃止） ===== */
+#screen-difficulty .levels { gap: 12px; width: min(560px, 94vw); grid-template-columns: repeat(3, 1fr); }
+#screen-difficulty .lv-card { padding: 22px 8px; gap: 10px; border-radius: 18px; }
+#screen-difficulty .lv-name { font-size: 21px; font-weight: 800; }
+#screen-difficulty .lv-stars { font-size: 18px; letter-spacing: .1em; filter: drop-shadow(0 0 8px #ffd86b66); white-space: nowrap; }
