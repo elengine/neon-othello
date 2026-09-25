@@ -87,8 +87,11 @@ function layoutBoard(): void {
 }
 
 function drawAll(opts: { legal?: boolean } = {}): void {
+  // マーカーは「実際に打てる手番」の合法手のみ描く（v1.8.0: 相手足の合法手漏れ・パス後の不整合対策）
+  const showLegal = opts.legal && gameStatus(state.board) === 'playing' && !state.thinking &&
+    (state.mode !== 'online' || state.board.turn === state.humanStone);
   renderer.draw(state.board, {
-    legal: opts.legal && gameStatus(state.board) === 'playing' && !state.thinking,
+    legal: showLegal,
     last: true,
     flippedCells: state.pendingFlip.cells,
     flipAnim: state.pendingFlip.cells.length ? state.pendingFlip.anim : undefined,
@@ -153,6 +156,7 @@ function checkTurn(): void {
     if (state.mode === 'online' && state.board.turn === state.humanStone) sendPass();
     state.board = applyPass(state.board);
     if (gameStatus(state.board) === 'over') { finishGame(); return; }
+    drawAll({ legal: true });   // v1.8.0: パスで手番が返った盤面に即再描画（マーカーが出ない不具合対策）
   }
   if (state.mode === 'online') { startTurnTimer(); return; } // AI禁止・相手待ちタイマー
   if (state.aiLevel === 0) return;                          // 2人対戦: 交代で両者タップ
@@ -226,7 +230,8 @@ async function finishGame(): Promise<void> {
   const text = forced === 'win' ? (forcedLabel || 'あなたの不戦勝！')
     : forced === 'lose' ? '離脱により不戦敗'
     : w === 'draw' ? '引き分け'
-    : localMode ? (w === BLACK ? '黒の勝ち！' : '白の勝ち！')
+    : localMode ? (w === BLACK ? '黒（プレイヤー１）の勝ち！' : '白（プレイヤー２）の勝ち！')
+    : state.mode === 'online' ? (w === state.humanStone ? 'あなたの勝ち！' : '相手の勝ち')   // v1.8.0: オンラインで「AIの勝ち」誤表示を修正
     : (w === state.humanStone ? 'あなたの勝ち！' : 'AIの勝ち');
   $('result-text').textContent = text;
   const meIsBlack = state.humanStone === BLACK;
