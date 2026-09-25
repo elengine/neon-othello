@@ -13,7 +13,7 @@ import { supabaseConfigured } from './supabase/client';
 import { celebrateLevelUp } from './ui/celebrate';
 import { sfx, toggleMute, setSound } from './audio/sfx';
 import { renderRanking, renderHistory } from './ui/rankingView';
-import { initOnline, enterLobby, setWaiting, invite, isOnlinePlaying, onlineCB, setInviteHandler, endMatch, sendMove, sendPass, sendResign, saveSnapshot, leaveLobby, amWaiting, type Opponent } from './net/online';
+import { initOnline, enterLobby, setWaiting, invite, isOnlinePlaying, onlineCB, setInviteHandler, endMatch, sendMove, sendPass, sendResign, sendBye, saveSnapshot, leaveLobby, amWaiting, type Opponent } from './net/online';
 import { encodeMoves } from './core/board';
 
 declare const __APP_VERSION__: string | undefined;
@@ -33,6 +33,8 @@ const state = {
   mode: 'ai' as 'ai' | 'online',
   opp: null as Opponent | null,
   oppTimeout: 0 as ReturnType<typeof setInterval> | 0,
+  forcedResult: null as null | 'win' | 'lose',  // オンライン相手離脱時の不戦勝/不戦敗（盤面計算を上書き）
+  forcedLabel: '',                              // 結果画面の勝利文言（bye/切断/投了で文言を変える）
   theme: NEON_DEFAULT,
   themeName: 'neon' as 'neon' | 'classic' | 'custom',
 };
@@ -219,7 +221,11 @@ async function finishGame(): Promise<void> {
   const w = winner(state.board);
   const { black, white } = stoneCount(state.board);
   const localMode = state.mode === 'ai' && state.aiLevel === 0;
-  const text = w === 'draw' ? '引き分け'
+  const forced = state.forcedResult; const forcedLabel = state.forcedLabel; state.forcedResult = null; state.forcedLabel = '';
+  const iWon = forced ? forced === 'win' : w === state.humanStone;
+  const text = forced === 'win' ? (forcedLabel || 'あなたの不戦勝！')
+    : forced === 'lose' ? '離脱により不戦敗'
+    : w === 'draw' ? '引き分け'
     : localMode ? (w === BLACK ? '黒の勝ち！' : '白の勝ち！')
     : (w === state.humanStone ? 'あなたの勝ち！' : 'AIの勝ち');
   $('result-text').textContent = text;
@@ -231,7 +237,7 @@ async function finishGame(): Promise<void> {
     ? `黒 ${black} — 白 ${white}（全${state.board.moveCount}手）`
     : `あなた ${myCnt} — 相手 ${oppCnt}（全${state.board.moveCount}手）`;
   show('result');
-  playSound(w === 'draw' ? 'draw' : (w === state.humanStone ? 'win' : 'lose'));
+  playSound(!forced && w === 'draw' ? 'draw' : (iWon ? 'win' : 'lose'));
   // クラウド投稿（ログイン時）→ 獲得XP/レベルアップ演出
   const me = currentProfile();
   const badge = $('result-xp');
@@ -245,7 +251,7 @@ async function finishGame(): Promise<void> {
     badge.textContent = '戦績を保存中…';
     try {
       const r = await submitGame({
-        mode: state.mode, result: w === 'draw' ? 'draw' : (w === state.humanStone ? 'win' : 'lose'),
+        mode: state.mode, result: forced ? forced : (w === 'draw' ? 'draw' : (w === state.humanStone ? 'win' : 'lose')),
         ai_level: state.mode === 'ai' ? state.aiLevel : undefined, black_count: black, white_count: white,
         moves: state.board.moveCount, moves_svg: encodeMoves(lastMoves),
         opp_user: state.mode === 'online' ? (state.opp?.id ?? null) : null,
@@ -361,17 +367,30 @@ export function boot(): void {
     checkTurn();
     drawAll({ legal: true });   // パス後: 合法手マーカーを復元
   };
-  onlineCB.onRemoteResign = async () => { stopTurnTimer(); toast('相手が投了しました'); await endMatch(); finishGame(); };
+  onlineCB.onRemoteResign = async () => { stopTurnTimer(); cancelAI(); toast('相手が投了しました'); state.forcedResult = 'win'; state.forcedLabel = '相手が投了しました（あなたの勝ち）'; await endMatch(); finishGame(); };
   // 招待の応答ハンドリング（v1.5.0）: 承諾されるまで招待側はゲーム画面に移行しない
   onlineCB.onInviteDeclined = (opp) => { toast(`${opp.display_name} が招待を拒否しました`); };
   onlineCB.onInviteTimeout = (opp) => { toast(`${opp.display_name} から応答がありません`); };
-  onlineCB.onOpponentLeft = async () => {
+  // ---- 相手離脱ハンドリング（v1.7.0）----
+  // bye（ゲーム終了/タイトル等の明示退出）→ 即時不戦勝。切断は30秒猶予後に不戦勝。
+  // 盤面石数で勝敗を計算せず forcedResult を優先し、戦績にも正しく反映する。
+  const opponentGone = async (msg: string) => {
+    if (state.screen !== 'game' || state.mode !== 'online' || !isOnlinePlaying()) return;
+    stopTurnTimer(); cancelAI();
+    state.forcedResult = 'win'; state.forcedLabel = msg;
+    toast(msg);
+    await endMatch(false);
+    document.body.classList.remove('online-game');
+    finishGame();
+  };
+  onlineCB.onOpponentBye = () => void opponentGone('相手がゲームを終了しました（あなたの不戦勝）');
+  onlineCB.onOpponentLeft = () => {
     if (!isOnlinePlaying()) return;
-    toast('相手が切断されました（60秒以内に復帰ないと不戦勝）');
+    toast('相手が切断されました（30秒以内に復帰ないと不戦勝）');
     let sec = 0;
     const iv = setInterval(async () => {
       sec += 1;
-      if (sec >= 60) { clearInterval(iv); if (isOnlinePlaying()) { await endMatch(); finishGame(); } }
+      if (sec >= 30) { clearInterval(iv); await opponentGone('相手の復帰がありませんでした（あなたの不戦勝）'); }
     }, 1000);
   };
   $('btn-local').addEventListener('click', startLocal);
@@ -398,7 +417,7 @@ export function boot(): void {
   $('btn-result-title').addEventListener('click', () => show('title'));
   $('btn-pause').addEventListener('click', () => setPaused(!paused));
   $('btn-resume').addEventListener('click', () => setPaused(false));
-  $('btn-quit').addEventListener('click', () => { setPaused(false); stopTurnTimer(); cancelAI(); if (state.mode === 'online') { void endMatch(); document.body.classList.remove('online-game'); } state.board = initialBoard(); lastMoves = []; show('title'); });
+  $('btn-quit').addEventListener('click', () => { setPaused(false); stopTurnTimer(); cancelAI(); if (state.mode === 'online') { if (isOnlinePlaying()) sendBye(); void endMatch(false); document.body.classList.remove('online-game'); } state.board = initialBoard(); lastMoves = []; state.forcedResult = null; show('title'); });
   ($('btn-mute') as HTMLElement).addEventListener('click', (e) => {
     const m = toggleMute();
     Prefs.sound = !m; savePrefs();   // 設定画面チェックと同期

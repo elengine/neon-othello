@@ -152,10 +152,10 @@ export function search(
 }
 
 // ---- レベル定義（設計書 §5 の表） ----
-export interface AIProfile { depth: number; timeBudgetMs: number; randomness: number; }
+export interface AIProfile { depth: number; timeBudgetMs: number; randomness: number; blunderChance?: number; }
 export const AI_LEVELS: Record<number, AIProfile> = {
-  1: { depth: 1, timeBudgetMs: 300, randomness: 0.6 },  // 見習い
-  2: { depth: 3, timeBudgetMs: 500, randomness: 0.15 }, // 初段
+  1: { depth: 1, timeBudgetMs: 300, randomness: 1.5, blunderChance: 0.4 },  // 見習い（v1.7.0 弱化: 40%で完全ランダム手）
+  2: { depth: 2, timeBudgetMs: 500, randomness: 0.4, blunderChance: 0.15 }, // 初段（v1.7.0 弱化: 1手読み+15%ポカ）
   3: { depth: 5, timeBudgetMs: 1000, randomness: 0 },   // 三段
   4: { depth: 7, timeBudgetMs: 1500, randomness: 0 },   // 有段
   5: { depth: 9, timeBudgetMs: 2500, randomness: 0 },   // 名人
@@ -166,6 +166,13 @@ export function aiMove(board: Board, level: number): { cell: number; pass: boole
   const prof = AI_LEVELS[level] ?? AI_LEVELS[3];
   const legal = legalBB(board.bb, board.turn);
   if (legal === 0n) return { cell: -1, pass: true };
+  // 低レベルのポカ演出: 確率で完全ランダム合法手
+  if (prof.blunderChance && Math.random() < prof.blunderChance) {
+    const moves: number[] = [];
+    let x = legal;
+    while (x !== 0n) { moves.push(leastBitIndex(x)); x &= x - 1n; }
+    return { cell: moves[Math.floor(Math.random() * moves.length)], pass: false };
+  }
   const r = search(board.bb, board.turn, prof.depth, {
     timeBudgetMs: prof.timeBudgetMs, randomness: prof.randomness,
   });

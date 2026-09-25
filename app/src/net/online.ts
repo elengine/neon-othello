@@ -14,10 +14,12 @@ const CB = {
   onOpponentLeft: null as (() => void) | null,
   onInviteDeclined: null as ((opp: Opponent) => void) | null,
   onInviteTimeout: null as ((opp: Opponent) => void) | null,
+  onOpponentBye: null as (() => void) | null,
 };
 export const onlineCB = CB;
 
 let matchCh: RealtimeChannel | null = null;
+let oppLeftNotified = false;   // 切断/byeハンドラの多重発火防止
 export let onlineState: 'offline' | 'waiting' | 'invited' | 'playing' = 'offline';
 let myInvitePoll: ReturnType<typeof setInterval> | null = null;
 let currentMatchId: string | null = null;
@@ -188,6 +190,7 @@ async function acceptInvite(inviteId: string, opp: Opponent): Promise<void> {
 async function subscribeMatch(matchId: string, iAmBlack: boolean, opp: Opponent): Promise<void> {
   const sb = supabase(); if (!sb) return;
   await setWaiting(false);
+  oppLeftNotified = false;
   matchCh = sb.channel('oth-match:' + matchId, { config: { broadcast: { self: false } } });
   await matchCh.on('broadcast', { event: 'mv' }, ({ payload }) => {
     const p = payload as { cell: number; seq: number };
@@ -195,9 +198,11 @@ async function subscribeMatch(matchId: string, iAmBlack: boolean, opp: Opponent)
     CB.onRemoteMove?.(p.cell);
   }).on('broadcast', { event: 'pass' }, () => CB.onRemotePass?.())
     .on('broadcast', { event: 'resign' }, () => CB.onRemoteResign?.())
+    .on('broadcast', { event: 'bye' }, () => { oppLeftNotified = true; CB.onOpponentBye?.(); })   // 正常終了操作（ゲーム終了/再挑戦等）
     .on('presence', { event: 'sync' }, () => {
+      if (oppLeftNotified) return;
       const st = matchCh!.presenceState(); const n = Object.keys(st).length;
-      if (n === 1) CB.onOpponentLeft?.();
+      if (n === 1) { oppLeftNotified = true; CB.onOpponentLeft?.(); }  // 多重syncでの二重発火防止
     })
     .subscribe(async (s) => {
       if (s === 'SUBSCRIBED') {
@@ -216,6 +221,8 @@ export function sendMove(cell: number): void {
 }
 export function sendPass(): void { void matchCh?.send({ type: 'broadcast', event: 'pass', payload: {} }); }
 export function sendResign(): void { void matchCh?.send({ type: 'broadcast', event: 'resign', payload: {} }); }
+/** 対局中に「ゲーム終了/再挑戦/タイトルへ」等で離脱する旨を先に伝える（相手は即不戦勝表示できる） */
+export function sendBye(): void { void matchCh?.send({ type: 'broadcast', event: 'bye', payload: {} }); }
 
 /** 盤面スナップショット（復元・照合用）をDBへ保存 */
 export async function saveSnapshot(movesSvg: string): Promise<void> {
