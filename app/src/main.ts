@@ -476,8 +476,8 @@ function refreshPlayerLabels(): void {
     topLabel!.textContent = `${state.opp.display_name.slice(0, 12)} Lv${state.opp.level}`;
     bottomLabel!.textContent = myName;
   } else if (state.aiLevel === 0) {
-    topLabel!.textContent = '白';
-    bottomLabel!.textContent = '黒';
+    topLabel!.textContent = 'プレイヤー２';   // 上=白
+    bottomLabel!.textContent = 'プレイヤー１'; // 下=黒
   } else {
     topLabel!.textContent = `AI Lv${state.aiLevel}`;
     bottomLabel!.textContent = myName;
@@ -495,8 +495,7 @@ function startAI(lv: number): void {
 
 function startLocal(): void {
   state.mode = 'ai'; state.aiLevel = 0;    // aiLevel=0 = AI不出現（2人対戦モード）
-  $('hud-top').querySelector('span:nth-child(2)')!.textContent = '白';   // 上=白（下=黒）
-  $('hud-bottom').querySelector('span:nth-child(2)')!.textContent = '黒';
+  refreshPlayerLabels();   // プレイヤー１/プレイヤー２
   document.body.classList.remove('online-game');
   state.board = initialBoard(); lastMoves = [];
   show('game'); layoutBoard(); drawAll({ legal: true });

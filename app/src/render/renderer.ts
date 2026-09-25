@@ -98,15 +98,23 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
       }
     }
     // めくり中の返される石は「返り先の手番側」に描かれている（applyMove後の盤面＋flippedCells指定）
-    // 合法手マーカー
+    // 合法手マーカー（視認性: 外リング＋明るい芯の二重構造・テーマ依存しない明度で統一）
     if (o.legal) {
       const lm = legalBB(board.bb, board.turn);
+      const ringColor = board.turn === BLACK ? '#4de3ff' : '#ff7bff';   // 手番石と同系だが高明度・高不透明
       let m = lm;
-      ctx.fillStyle = board.turn === BLACK ? theme.black + '55' : theme.white + '55';
       while (m !== 0n) {
         const i = leastBitIndex(m); m &= m - 1n;
         const r = i >> 3, c = i & 7;
-        ctx.beginPath(); ctx.arc(c * cell + cell / 2, r * cell + cell / 2, cell * 0.12, 0, Math.PI * 2); ctx.fill();
+        const cx = c * cell + cell / 2, cy = r * cell + cell / 2;
+        // 外リング（太め・不透明）
+        ctx.beginPath(); ctx.arc(cx, cy, cell * 0.30, 0, Math.PI * 2);
+        ctx.strokeStyle = ringColor; ctx.lineWidth = Math.max(2.5, cell * 0.045);
+        ctx.globalAlpha = 0.9; ctx.stroke();
+        // 芯（白ドット・視認の核）
+        ctx.beginPath(); ctx.arc(cx, cy, cell * 0.10, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff'; ctx.fill();
+        ctx.globalAlpha = 1;
       }
     }
     // ホバープレビュー（返る石ハイライト）

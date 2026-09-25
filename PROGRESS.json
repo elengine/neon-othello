@@ -1,8 +1,8 @@
 {
   "project": "NEON OTHELLO",
-  "updated_at": "2026-09-26 04:30 JST",
-  "phase": "v0.7.0 公開完了",
-  "status": "done",
-  "note": "ラウンド6: スタート順(タイトル→バージョン→認証→プレイ→サブ)、テーマpad縮小+可変グリッド、トグルOFF時22px/ON時31pxでノブ枠内確定、手番文言廃止→アイコングロー、AI思考を盤上透過、手数完全非表示、結果詳細あなた/相手+19px、パス後マーカー復元、2人対戦上=白、保存エラー原因表示化。CI成功・本番v0.7.0確認済",
-  "done": ["v0.1-0.3 機能/UI刷新", "v0.4-0.6 設定/2人対戦", "v0.7.0 ラウンド6全12件"]
+  "updated_at": "2026-09-26 09:10 JST",
+  "phase": "v0.9.0 公開完了",
+  "status": "blocked_on_user",
+  "note": "ラウンド7: 終了画面ボタン大型、stats guard RPC許可(app.oth_rpc フラグ)、騎手アイコン右にユーザ名(hud-me-name/hud-opp-name)。【ユーザー操作待ち】SQL fix_stats_guard.sql の実行が必要",
+  "done": ["v0.1-0.8 機能/UI刷新", "v0.9.0 名前表示+保存修正SQL"]
 }
