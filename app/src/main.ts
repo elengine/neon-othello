@@ -78,6 +78,7 @@ function show(s: Screen): void {
   if (s === 'game') layoutBoard();
   if (s === 'ranking') void renderRanking();
   if (s === 'history') void renderHistory();
+  if (s === 'title') refreshChrome();   // v2.1.9: レベルアップ/戦績更新直後にタイトルへ戻ると上部カードが古いまま（show('title')が唯一走らない経路）→毎回再描画
 }
 
 function layoutBoard(): void {

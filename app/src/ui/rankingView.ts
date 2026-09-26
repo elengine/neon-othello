@@ -49,8 +49,10 @@ export async function renderHistory(): Promise<void> {
   const rows = await fetchHistory(30);
   const me = currentProfile();
   const meBar = $('history-me');
+  // v2.1.9: 未ログイン時は戦績バーを空にし、一覧側の「ログインすると…」案内1本だけ表示。
+  // 旧: バーと一覧の両方に同文を出して二重表示バグ（実機報告）。
   meBar.textContent = me ? `Lv${me.level} ${titleFor(me.level)}｜${me.wins}勝${me.losses}敗${me.draws}分（連勝${me.streak}/最長${me.best_streak}）`
-    : 'ログインすると履歴が見られます';
+    : '';
   list.innerHTML = '';
   if (!me) { list.innerHTML = '<li class="rank-loading">ログインすると履歴が見られます</li>'; return; }
   if (rows.length === 0) { list.innerHTML = '<li class="rank-loading">まだ対局記録がありません</li>'; return; }
