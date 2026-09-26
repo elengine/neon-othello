@@ -26,6 +26,7 @@
         </div>
         <div class="menu menu-sub">
           <button id="btn-ranking" class="btn btn-ghost2">🏆 ランキング</button>
+          <button id="btn-history" class="btn btn-ghost2">📜 対戦履歴</button>
           <button id="btn-settings" class="btn btn-ghost2">⚙️ 設定</button>
         </div>
         <button id="btn-logout" class="logout-mini hidden">ログアウト</button>
@@ -120,7 +121,12 @@
         </div>
         <ul id="rank-list" class="rank-list"></ul>
         <div id="rank-me" class="rank-me"></div>
-        <h2 style="margin-top:14px">あなたの履歴</h2>
+      </section>
+
+      <!-- S9b 対戦履歴（ランキングから切り出し・v2.1.7） -->
+      <section id="screen-history" class="screen">
+        <button id="back-history" class="back">← タイトル</button>
+        <h2>対戦履歴</h2>
         <ul id="history-list" class="hist-list"></ul>
       </section>
 

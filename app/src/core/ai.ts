@@ -127,11 +127,12 @@ export function search(
       } catch (e) { if (e instanceof Deadline) { aborted = true; break; } throw e; }
     }
     if (aborted) {
-      // v2.1.6: deadline中断でも「このラウンドで現時点の最善」roundBestが前回より良ければ採用。
-      // 旧: 中断ラウンドを丸ごと破棄し best=legal[0]（最初の合法手）に堕ちる劣化があった。
-      // 遅いCIランナーで名人Lv5が実質バラ打ちになり、強度順序テストがflaky化していた真因。
-      if (reached === 0 && roundBestScore > bestScore) { best = roundBest; bestScore = roundBestScore; reached = 1; }
-      else if (roundBestScore > bestScore && roundBestScore !== -Infinity) { best = roundBest; bestScore = roundBestScore; }
+      // v2.1.6b: deadline中断対策は「完走した探索が1つも無い初動」のみ。この場合の旧動作は
+      // best=legal[0]（最初の合法手）に堕ちる実バグで、低予算Lv5がCI遅延環境でバラ打ち化→強度順序
+      // テストflaky(v2.1.5 CI失敗)の真因。中断ラウンド評価済みのうち最善手を採用する。
+      // ※完走roundがある場合は従来どおり完走bestを維持（v2.1.6で中断roundを採ると名人の収束性が
+      //  timing依存になり、中盤収束テストが壊れた教訓）。
+      if (reached === 0 && roundBestScore !== -Infinity) { best = roundBest; bestScore = roundBestScore; reached = 1; }
       break;
     }
     best = roundBest; bestScore = roundBestScore; reached = depth;

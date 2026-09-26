@@ -22,7 +22,7 @@ export const APP_VERSION = (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSI
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
-type Screen = 'title' | 'difficulty' | 'game' | 'result' | 'settings' | 'ranking' | 'lobby';
+type Screen = 'title' | 'difficulty' | 'game' | 'result' | 'settings' | 'ranking' | 'history' | 'lobby';
 const state = {
   screen: 'title' as Screen,
   board: initialBoard(),
@@ -72,11 +72,12 @@ function scheduleAIReturn(): void { scheduleAI(); }  // 再開時のAI再開（A
 
 function show(s: Screen): void {
   state.screen = s;
-  for (const id of ['screen-title', 'screen-difficulty', 'screen-game', 'screen-result', 'screen-settings', 'screen-ranking', 'screen-lobby']) {
+  for (const id of ['screen-title', 'screen-difficulty', 'screen-game', 'screen-result', 'screen-settings', 'screen-ranking', 'screen-history', 'screen-lobby']) {
     $(id).classList.toggle('active', id === 'screen-' + s);
   }
   if (s === 'game') layoutBoard();
-  if (s === 'ranking') { void renderRanking(); void renderHistory(); }
+  if (s === 'ranking') void renderRanking();
+  if (s === 'history') void renderHistory();
 }
 
 function layoutBoard(): void {
@@ -419,6 +420,7 @@ export function boot(): void {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) void rebeat(); });
   $('btn-settings').addEventListener('click', () => show('settings'));
   $('btn-ranking').addEventListener('click', () => show('ranking'));
+  $('btn-history').addEventListener('click', () => show('history'));   // v2.1.7: 対戦履歴を別画面へ切り出し
   $('btn-login').addEventListener('click', () => loginWithGoogle());
   $('btn-logout').addEventListener('click', () => {
     if (window.confirm('ログアウトしますか？ ランキング・オンライン対戦が使えなくなります')) void logout().then(refreshChrome);
@@ -462,6 +464,7 @@ export function boot(): void {
     (e.currentTarget as HTMLElement).textContent = m ? '🔇' : '🔊';
   });
   $('back-rank').addEventListener('click', () => show('title'));
+  $('back-history').addEventListener('click', () => show('title'));
   document.querySelectorAll('[data-rank-tab]').forEach((el) => el.addEventListener('click', () => {
     document.querySelectorAll('[data-rank-tab]').forEach((x) => x.classList.toggle('active', x === el));
     void renderRanking();
