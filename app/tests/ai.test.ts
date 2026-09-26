@@ -48,18 +48,20 @@ describe('AIエンジン', () => {
     expect(wins).toBeGreaterThanOrEqual(5);
   }, 180000);
 
-  it('Lv3(三段)もランダム近いLv1より勝る（8局中5勝以上・ポカ10%許容）', () => {
+  it('Lv3(三段)もランダム近いLv1より勝る（24局中12勝以上・ポカ10%許容）', () => {
+    // v2.1.7: 旧「8局中5勝」は実測勝率~0.75でP(4勝以下)≈13%ありCIで再発flaky（実測4回: 3/6/8/6勝）。
+    // 24局に増やし閾値12（期待18, ≈3σ下）→ 失敗確率~0.2%。ローカル実測 w24=14〜20。
     const save3 = AI_LEVELS[3].timeBudgetMs;
     AI_LEVELS[3].timeBudgetMs = 200;
     let wins = 0;
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 24; i++) {
       const r = i % 2 === 0 ? playGame(3, 1, i) : playGame(1, 3, i);
       const strongWon = i % 2 === 0 ? r === 'black' : r === 'white';
       if (strongWon) wins++;
     }
     AI_LEVELS[3].timeBudgetMs = save3;
-    expect(wins).toBeGreaterThanOrEqual(5);
-  }, 180000);
+    expect(wins).toBeGreaterThanOrEqual(12);
+  }, 300000);
 
   it('見習い(Lv1)でも対戦は成立する（手詰まりで無限ループしない）', () => {
     const r = playGame(1, 1);
