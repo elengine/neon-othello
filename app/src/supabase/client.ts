@@ -15,7 +15,10 @@ export function supabase(): SupabaseClient | null {
   const key = getEnv('VITE_SUPABASE_ANON_KEY');
   if (!url || !key) return null; // 未設定時はクラウド機能を静かに無効化（無ログインAI戦は続行可）
   client = createClient(url, key, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    auth: {
+      persistSession: true, autoRefreshToken: true, detectSessionInUrl: true,
+      // ※storageKeyは既定のまま（変えると既存ログイン全員のセッションが飛ぶため）
+    },
   });
   return client;
 }

@@ -32,8 +32,26 @@ export async function initAuth(onChange: (s: Session | null) => Promise<void>): 
   const sb = supabase(); if (!sb) return;
   const { data } = await sb.auth.getSession();
   await onChange(data.session);
-  sb.auth.onAuthStateChange((_e, s) => { void onChange(s); });
+  // v2.1.0(A): 起動時＆画面復帰時に能動リフレッシュ。ローテーションされるリフレッシュトークンを
+  // 毎回更新し続けることで「数日ぶりに開いたら72時間で失効→ログアウト」を防止する。
+  void sb.auth.refreshSession().catch(() => { /* 要再ログインは下のイベントで通知 */ });
+  document.addEventListener?.('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void sb.auth.refreshSession().catch(() => {});
+  });
+  let had = !!data.session;
+  sb.auth.onAuthStateChange((e, s) => {
+    // v2.1.0(B): 意図しない失効(SIGNED_OUT/初期化済みセッション消失)をUIへ明示通知
+    if (!s && had && e !== 'SIGNED_OUT') onSessionLost();
+    if (!s && had && e === 'SIGNED_OUT' && !manualLogout) onSessionLost();
+    had = !!s;
+    if (s) manualLogout = false;
+    void onChange(s);
+  });
 }
+let manualLogout = false;
+let onLost: (() => void) | null = null;
+export function setSessionLostHandler(fn: () => void): void { onLost = fn; }
+function onSessionLost(): void { if (onLost) onLost(); }
 
 export function loginWithGoogle(): void {
   const sb = supabase(); if (!sb) return;
@@ -42,6 +60,7 @@ export function loginWithGoogle(): void {
 }
 
 export async function logout(): Promise<void> {
+  manualLogout = true;
   await supabase()?.auth.signOut();
   cached = null;
 }

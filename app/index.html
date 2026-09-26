@@ -13,7 +13,12 @@
       <section id="screen-title" class="screen active">
         <h1 class="logo">NEON<br>OTHELLO</h1>
         <p id="app-version" class="version">v0.0.0</p>
-        <button id="btn-login" class="login">🔑 Googleでログイン</button>
+        <button id="btn-login" class="login-main">🔑 Googleでログイン</button>
+        <div id="account-card" class="account-card hidden">
+          <img id="account-ava" class="account-ava" src="" alt="" onerror="this.style.visibility='hidden'">
+          <span class="account-info"><b id="account-name">-</b><small id="account-lv"></small></span>
+          <span class="account-on">ログイン中</span>
+        </div>
         <div class="menu">
           <button id="btn-ai" class="btn btn-main">🤖 AI対戦</button>
           <button id="btn-local" class="btn btn-main">👥 2人対戦</button>
@@ -23,6 +28,7 @@
           <button id="btn-ranking" class="btn btn-ghost2">🏆 ランキング</button>
           <button id="btn-settings" class="btn btn-ghost2">⚙️ 設定</button>
         </div>
+        <button id="btn-logout" class="logout-mini hidden">ログアウト</button>
       </section>
 
       <!-- S2 難易度 -->

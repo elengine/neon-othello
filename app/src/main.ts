@@ -8,7 +8,7 @@ import { aiMove } from './core/ai';
 import { makeRenderer, NEON_DEFAULT, CLASSIC } from './render/renderer';
 import { PRESETS, prefToTheme, savePref, loadPref, loadImage } from './ui/stonePrefs';
 import gsap from 'gsap';
-import { initAuth, currentProfile, loginWithGoogle, logout, submitGame, titleFor, refreshProfile } from './supabase/auth';
+import { initAuth, currentProfile, loginWithGoogle, logout, submitGame, titleFor, refreshProfile, setSessionLostHandler } from './supabase/auth';
 import { supabaseConfigured } from './supabase/client';
 import { celebrateLevelUp } from './ui/celebrate';
 import { sfx, toggleMute, setSound } from './audio/sfx';
@@ -414,7 +414,10 @@ export function boot(): void {
   $('btn-local').addEventListener('click', startLocal);
   $('btn-settings').addEventListener('click', () => show('settings'));
   $('btn-ranking').addEventListener('click', () => show('ranking'));
-  $('btn-login').addEventListener('click', () => currentProfile() ? void logout().then(refreshChrome) : loginWithGoogle());
+  $('btn-login').addEventListener('click', () => loginWithGoogle());
+  $('btn-logout').addEventListener('click', () => {
+    if (window.confirm('ログアウトしますか？ ランキング・オンライン対戦が使えなくなります')) void logout().then(refreshChrome);
+  });
   $('back-title').addEventListener('click', () => show('title'));
   $('back-title2').addEventListener('click', () => show('title'));
 
@@ -508,12 +511,26 @@ export function boot(): void {
 
   applyTheme(); show('title');
   refreshPlayerLabels();
+  setSessionLostHandler(() => {
+    toast('セッションが期限切れになりました。再度ログインしてください');
+    setTimeout(() => { loginBanner(); }, 300);
+  });
   void initAuth(async (s) => {
     if (s) await refreshProfile();
     refreshChrome();
     refreshPlayerLabels();
     if (s) { void restorePref(); void initOnline(); }
   });
+}
+
+// 失効時にログインを促すネオンバナー（更新バナーと同じ出方・タップでGoogleログイン）
+function loginBanner(): void {
+  if (document.getElementById('login-banner')) return;
+  const el = document.createElement('div');
+  el.id = 'login-banner';
+  el.textContent = '🔑 ログインが切れました。タップして再ログイン';
+  document.body.appendChild(el);
+  el.addEventListener('click', () => { el.remove(); loginWithGoogle(); });
 }
 
 // ---- 対戦者ラベル: アイコン右の名前 ----
@@ -553,11 +570,24 @@ function startLocal(): void {
 
 function refreshChrome(): void {
   const me = currentProfile();
-  const btn = $('btn-login');
+  const loginBtn = $('btn-login');
+  const card = $('account-card');
+  const logoutBtn = $('btn-logout');
   if (me) {
-    btn.textContent = `👤 ${me.display_name}（Lv${me.level} ${titleFor(me.level)}） / ログアウト`;
+    loginBtn!.classList.add('hidden');
+    card!.classList.remove('hidden');
+    ( $('account-name') as HTMLElement).textContent = me.display_name;
+    ( $('account-lv') as HTMLElement).textContent = `Lv${me.level} ${titleFor(me.level)}・${me.wins}勝${me.losses}敗`;
+    const ava = $('account-ava') as HTMLImageElement;
+    if (me.avatar_url) ava.src = me.avatar_url; else ava.style.visibility = 'hidden';
+    logoutBtn!.classList.remove('hidden');   // ログアウトは最下部の地味リンク
     state.prevLevel = me.level;
-  } else btn.textContent = '🔑 Googleでログイン';
+  } else {
+    loginBtn!.classList.remove('hidden');
+    card!.classList.add('hidden');
+    logoutBtn!.classList.add('hidden');
+    loginBtn!.textContent = '🔑 Googleでログインして対戦記録＆オンライン対戦を楽しむ';
+  }
 }
 
 function renderLobby(list: Opponent[], me?: Opponent | null): void {
