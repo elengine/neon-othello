@@ -220,14 +220,16 @@ async function subscribeMatch(matchId: string, iAmBlack: boolean, opp: Opponent)
       if (s === 'SUBSCRIBED') {
         await matchCh!.track({ uid: currentProfile()?.id });
         CB.onMatchStart?.(iAmBlack, opp, '');
-        // v2.1.2: bye/resignブロードキャストがRealtime断で相手に届かなかった場合の保険。
-        // 5秒ごとにマッチ行のDB status を見て ended/abandoned なら onOpponentBye と同扱いで発火。
+        // v2.1.2b: bye/resignブロードキャストがRealtime断で相手に届かなかった場合の保険。
+        // 5秒ごとにマッチ行のDB statusを見て ended/abandoned なら onOpponentBye と同扱いで発火。
+        // ※v2.1.2までの「byeSentなら中止」は送側のフラグで受側の判定と無関係→条件から除去（教訓）。
         if (!matchWatch) matchWatch = setInterval(() => {
-          if (onlineState !== 'playing' || !currentMatchId || byeSent) return;
+          if (onlineState !== 'playing' || !currentMatchId) return;
           void (async () => {
             const { data } = await sb.from('oth_matches').select('status').eq('id', currentMatchId!).maybeSingle();
             if (data && (data.status === 'ended' || data.status === 'abandoned')) {
-              oppLeftNotified = true; CB.onOpponentBye?.();
+              if (data.status === 'abandoned') oppLeftNotified = true;
+              CB.onOpponentBye?.();
             }
           })();
         }, 5000);
@@ -254,9 +256,14 @@ export async function saveSnapshot(movesSvg: string): Promise<void> {
 }
 export async function endMatch(ended = true): Promise<void> {
   const sb = supabase(); if (!sb || !currentMatchId) return;
-  // v2.1.2: 未終局離脱（abandoned）のみbyeを送る。自然終了は双方が最終手で自局判定済みのためbye不要
-  //（送ると相手のローカル終局判定と競合して誤「不戦勝」になり得る）。送信後フラッシュ待ち→DB更新→unsubscribe。
-  if (!ended && !byeSent && matchCh) { byeSent = true; void matchCh.send({ type: 'broadcast', event: 'bye', payload: {} }); await sleep(80); }
+  // v2.1.2b修正: 旧v2.1.2では「sendBye済み(byeSent=true)ならflush待ちせず即unsubscribe」しており、
+  // 一時停止→ゲーム終了（btn-quit: sendBye→endMatch）でbroadcastがソケットに流れる前に
+  // チャネルが壊れる競合が残っていた（実機報告「改善していない」の最有力原因）。
+  // → ended とらず abandon系は送付有無に関わらず必ずflush待ちを入れてから閉じる。
+  if (!ended) {
+    if (!byeSent && matchCh) { byeSent = true; void matchCh.send({ type: 'broadcast', event: 'bye', payload: {} }); }
+    await sleep(150);
+  }
   await sb.rpc('oth_match_update', { p_match: currentMatchId, p_moves: '', p_status: ended ? 'ended' : 'abandoned' });
   await matchCh?.unsubscribe(); matchCh = null; currentMatchId = null;
   if (matchWatch) { clearInterval(matchWatch); matchWatch = null; }
