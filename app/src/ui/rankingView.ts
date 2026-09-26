@@ -57,14 +57,14 @@ export async function renderHistory(): Promise<void> {
   if (rows.length === 0) { list.innerHTML = '<li class="rank-loading">まだ対局記録がありません</li>'; return; }
   for (const g of rows) {
     const li = document.createElement('li');
-    li.className = 'hist-item';
+    li.className = 'hist-item';   // v2.1.4 案A: 1レコード2行化（1行目=日時+相手名フル幅・2行目=結果/スコア/XP）
     const d = new Date(g.played_at);
     const modeTxt = g.mode === 'ai' ? (g.ai_level ? `AI ${aiLevelName(g.ai_level)}` : 'AI') : g.mode === 'online' ? 'オンライン' : 'ローカル';
-    li.innerHTML = `<span class="hist-date">${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</span>
-      <span class="hist-mode">${modeTxt}</span>
-      <span class="hist-result r-${g.result}">${g.result === 'win' ? '勝ち' : g.result === 'lose' ? '負け' : '引き分け'}</span>
+    li.innerHTML = `<div class="hist-line1"><span class="hist-date">${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</span>
+      <span class="hist-mode">${modeTxt}</span></div>
+      <div class="hist-line2"><span class="hist-result r-${g.result}">${g.result === 'win' ? '勝ち' : g.result === 'lose' ? '負け' : '引き分け'}</span>
       <span class="hist-score">${g.black_count}-${g.white_count}・${g.moves}手</span>
-      <span class="hist-xp">+${g.xp_gained}</span>`;
+      <span class="hist-xp">+${g.xp_gained}</span></div>`;
     list.appendChild(li);
   }
 }

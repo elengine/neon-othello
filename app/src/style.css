@@ -82,11 +82,11 @@ header, footer {
 #pass-toast {
   position: fixed; left: 50%; bottom: 18dvh; transform: translate(-50%, 20px);
   background: #000c; border: 1px solid var(--accent); color: var(--accent);
-  padding: 12px 26px; border-radius: 999px; opacity: 0; pointer-events: none;
-  transition: opacity .25s, transform .25s; z-index: 50; font-size: 26px; font-weight: 700;
+  padding: 10px 22px; border-radius: 999px; opacity: 0; pointer-events: none;
+  transition: opacity .25s, transform .25s; z-index: 50; font-size: 19px; font-weight: 700;  /* v2.1.5: 26→19px に縮小 */
   max-width: 92vw; text-align: center;
 }
-#pass-toast.show { opacity: 1; transform: translate(-50%, 0); }
+#pass-toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; cursor: pointer; }  /* v2.1.5: 表示中はタップで消せる */
 .result-card { display: flex; flex-direction: column; gap: 14px; align-items: center; margin-top: 14dvh;
   background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 34px 40px;
   box-shadow: 0 0 34px #16e0ff22; }
@@ -162,8 +162,9 @@ header, footer {
 /* ===== v2.0.2: PWA更新バナー ===== */
 #update-banner, #login-banner { position: fixed; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%);
   background: linear-gradient(95deg,#062c3a,#251042); border: 1.5px solid var(--stone-black); color: var(--accent);
-  padding: 12px 22px; border-radius: 999px; font-size: 15.5px; font-weight: 700; z-index: 60; cursor: pointer;
-  box-shadow: 0 0 18px #16e0ff44; animation: bannerPulse 1.6s infinite; white-space: nowrap; }
+  padding: 12px 22px; border-radius: 22px; font-size: 15.5px; font-weight: 700; z-index: 60; cursor: pointer;
+  box-shadow: 0 0 18px #16e0ff44; animation: bannerPulse 1.6s infinite;
+  max-width: min(560px, 92vw); white-space: normal; text-align: center; line-height: 1.45; }  /* v2.1.4 案A: nowrap廃止→大きい文字でも折返し表示で見切れなし */
 @keyframes bannerPulse { 0%,100% { box-shadow: 0 0 12px #16e0ff33; } 50% { box-shadow: 0 0 26px #16e0ff77; } }
 
 /* ===== v2.1.0: ログイン目立たせ / アカウント情報カード / ログアウト小型化 ===== */
@@ -174,23 +175,27 @@ header, footer {
   animation: ctaGlow 3.2s ease-in-out infinite; }
 .account-card { display: flex; align-items: center; gap: 14px; width: min(560px, 92vw); margin: 6px 0 14px;
   background: linear-gradient(120deg,#062c3a,#251042); border: 1.5px solid var(--stone-black); border-radius: 18px;
-  padding: 12px 18px; box-shadow: 0 0 18px #16e0ff33; }
+  padding: 12px 18px; box-shadow: 0 0 18px #16e0ff33;
+  flex-wrap: wrap; }   /* v2.1.4 案A: 文字拡大端末で戦績が途中で折り返される前に、バッジを丸ごと2行目へ回す */
 .account-ava { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; flex: none;
   border: 2px solid var(--accent); box-shadow: 0 0 12px #16e0ff66; background: #16203a; }
 .account-info { flex: 1; min-width: 0; }
 .account-info b { font-size: 21px; font-weight: 800; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--accent); text-shadow: 0 0 12px #16e0ff66; }
-.account-info small { font-size: 15px; color: var(--gold); font-weight: 700; }
+.account-info small { font-size: 15px; color: var(--gold); font-weight: 700; white-space: nowrap; }  /* 戦績は必ず1行 */
 .account-on { font-size: 13px; font-weight: 800; color: #062c3a; background: linear-gradient(95deg,#00d0ff,#7bff9c);
   border-radius: 999px; padding: 5px 12px; flex: none; }
 .logout-mini { align-self: center; order: 9; margin-top: auto; background: none; border: none; cursor: pointer;
   font-family: inherit; font-size: 12.5px; color: #46577c; text-decoration: underline; padding: 18px 8px 8px; }
 .logout-mini:active { color: #8fa3c8; }
 .rank-sep { text-align: center; color: #56688c; padding: 4px; }
-.hist-item { display: flex; gap: 8px; align-items: center; padding: 7px 10px; border-bottom: 1px solid #16203a; font-size: 12px; }
-.hist-date { color: #56688c; width: 7.2em; }
-.hist-mode { flex: 1; }
-.hist-result { width: 3.4em; text-align: center; border-radius: 8px; padding: 2px 0; }
+/* v2.1.4 案A: 履歴1レコード2行化 — 1行目=日時+相手名(フル幅)、2行目=結果/スコア/XP。文字拡大でも名前が折り返されない */
+.hist-item { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-bottom: 1px solid #16203a; font-size: 13px; }
+.hist-line1 { display: flex; gap: 10px; align-items: baseline; }
+.hist-line2 { display: flex; gap: 10px; align-items: center; }
+.hist-date { color: #56688c; flex: none; }
+.hist-mode { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
+.hist-result { width: 3.6em; text-align: center; border-radius: 8px; padding: 2px 0; }
 .hist-result.r-win { background: #16e0ff22; color: var(--accent); }
 .hist-result.r-lose { background: #ff3df522; color: #ff9df8; }
 .hist-result.r-draw { background: #ffd86b22; color: var(--gold); }

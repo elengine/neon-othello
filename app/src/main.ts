@@ -158,9 +158,8 @@ function checkTurn(): void {
       return;
     }
     // パス発生
-    $('pass-toast').classList.add('show');
+    toast('パス！');
     playSound('pass');
-    setTimeout(() => $('pass-toast').classList.remove('show'), 1400);
     if (state.mode === 'online') sendPass();
     state.board = applyPass(state.board);
     if (gameStatus(state.board) === 'over') { finishGame(); return; }
@@ -361,7 +360,8 @@ export function boot(): void {
     state.board = initialBoard(); lastMoves = [];
     show('game'); layoutBoard();
     refreshPlayerLabels();
-    toast(`対戦開始！ ${opp.display_name}（Lv${opp.level}） vs あなた${iAmBlack ? '（黒=先手）' : '（白=後手）'}`);
+    // v2.1.5: 開始トーストは先手/後手の告知のみ（長い名前行文は折返しバグの温床でもあった）
+    toast(iAmBlack ? 'あなたが先手です' : 'あなたは後手です');
   };
   onlineCB.onRemoteMove = (cell) => {
     if (state.screen !== 'game' || state.mode !== 'online') return;
@@ -644,10 +644,20 @@ function renderLobby(list: Opponent[], me?: Opponent | null): void {
   }
 }
 
-function toast(msg: string): void {
-  const t = $('pass-toast'); t.textContent = msg; t.classList.add('show');
-  setTimeout(() => { t.textContent = 'パス！'; t.classList.remove('show'); }, 1600);
+// v2.1.5: トースト刷新 — ①旧実装は消える直前にtextを'パス！'へ戻していたため、FadeOut中に
+// 「対戦開始！…」が「パス！」へ化けて見えるバグがあった（両者同時表示の正体）。→文字の書き換え廃止。
+// ②2秒表示、③タップで即消去、④フォント縮小（CSS側）
+let toastTimer = 0;
+function toast(msg: string, ms = 2000): void {
+  const t = $('pass-toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => t.classList.remove('show'), ms);
 }
+// v2.1.5: トーストタップで即消去
+document.getElementById('pass-toast')?.addEventListener?.('click', () => {
+  clearTimeout(toastTimer); $('pass-toast').classList.remove('show');
+});
 
 if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
