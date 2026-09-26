@@ -34,19 +34,32 @@ describe('AIエンジン', () => {
     expect(r.pass).toBe(true);
   });
 
-  it('強さが順序立つ: Lv3 > Lv1（自己対戦4局で強側3勝以上）', () => {
-    // Lv1は深さ1+高ランダムで明確に弱い。低予算で速く回す。
-    const save = AI_LEVELS[3].timeBudgetMs;
-    AI_LEVELS[3].timeBudgetMs = 120;
+  it('強さが順序立つ: Lv5 >> Lv1（自己対戦6局で強側5勝以上）', () => {
+    // v2.0.1でLv3は揺らぎ0.2+ポカ10%に弱体化されたため、強度順序の保証はポカなしのLv5で行う。
+    const save = AI_LEVELS[5].timeBudgetMs;
+    AI_LEVELS[5].timeBudgetMs = 150;
     let wins = 0;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
+      const r = i % 2 === 0 ? playGame(5, 1, i) : playGame(1, 5, i);
+      const strongWon = i % 2 === 0 ? r === 'black' : r === 'white';
+      if (strongWon) wins++;
+    }
+    AI_LEVELS[5].timeBudgetMs = save;
+    expect(wins).toBeGreaterThanOrEqual(5);
+  }, 180000);
+
+  it('Lv3(三段)もランダム近いLv1より勝る（8局中5勝以上・ポカ10%許容）', () => {
+    const save3 = AI_LEVELS[3].timeBudgetMs;
+    AI_LEVELS[3].timeBudgetMs = 200;
+    let wins = 0;
+    for (let i = 0; i < 8; i++) {
       const r = i % 2 === 0 ? playGame(3, 1, i) : playGame(1, 3, i);
       const strongWon = i % 2 === 0 ? r === 'black' : r === 'white';
       if (strongWon) wins++;
     }
-    AI_LEVELS[3].timeBudgetMs = save;
-    expect(wins).toBeGreaterThanOrEqual(3);
-  }, 120000);
+    AI_LEVELS[3].timeBudgetMs = save3;
+    expect(wins).toBeGreaterThanOrEqual(5);
+  }, 180000);
 
   it('見習い(Lv1)でも対戦は成立する（手詰まりで無限ループしない）', () => {
     const r = playGame(1, 1);
