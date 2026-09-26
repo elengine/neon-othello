@@ -10,7 +10,6 @@ export async function renderRanking(): Promise<void> {
   const tab = (document.querySelector('[data-rank-tab].active') as HTMLElement)?.dataset.rankTab ?? 'xp';
   if (!supabaseConfigured()) {
     list.innerHTML = '<li class="rank-loading">ランキングはまだ空です（サーバー未接続の可能性もあります）</li>';
-    $('rank-me').textContent = '';
     return;
   }
   list.innerHTML = '<li class="rank-loading">読み込み中…</li>';
@@ -18,7 +17,6 @@ export async function renderRanking(): Promise<void> {
   const me = currentProfile();
   if (rows.length === 0 && !me) {
     list.innerHTML = '<li class="rank-loading">ランキングはまだ空です（サーバー未接続の可能性もあります）</li>';
-    $('rank-me').textContent = '';
     return;
   }
   list.innerHTML = '';
@@ -30,9 +28,7 @@ export async function renderRanking(): Promise<void> {
     list.appendChild(sep);
     list.appendChild(rankRow({ ...me, losses: me.losses, draws: me.draws } as RankRow, rank ?? 0, true));
   }
-  const meBar = $('rank-me');
-  meBar.textContent = me ? `Lv${me.level} ${titleFor(me.level)}｜${me.wins}勝${me.losses}敗${me.draws}分（連勝${me.streak}/最長${me.best_streak}）`
-    : 'ログインするとあなたの順位が出ます';
+  // v2.1.8: 自分の戦績バーはランキングではなく対戦履歴画面へ移設（ご指摘）
 }
 
 function rankRow(r: RankRow, pos: number, isMe: boolean): HTMLElement {
@@ -52,6 +48,9 @@ export async function renderHistory(): Promise<void> {
   list.innerHTML = '<li class="rank-loading">読み込み中…</li>';
   const rows = await fetchHistory(30);
   const me = currentProfile();
+  const meBar = $('history-me');
+  meBar.textContent = me ? `Lv${me.level} ${titleFor(me.level)}｜${me.wins}勝${me.losses}敗${me.draws}分（連勝${me.streak}/最長${me.best_streak}）`
+    : 'ログインすると履歴が見られます';
   list.innerHTML = '';
   if (!me) { list.innerHTML = '<li class="rank-loading">ログインすると履歴が見られます</li>'; return; }
   if (rows.length === 0) { list.innerHTML = '<li class="rank-loading">まだ対局記録がありません</li>'; return; }
