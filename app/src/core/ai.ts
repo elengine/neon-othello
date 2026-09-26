@@ -108,8 +108,6 @@ export function search(
   const deadline = opts.timeBudgetMs ? performance.now() + opts.timeBudgetMs : Infinity;
 
   let best = legal[0], bestScore = -Infinity, reached = 0;
-  // ランダム性（低レベル用）: 上位候補をスコアで重み付け選択する代わりに、
-  // depth探索後に (全合法手 - 最大スコア) <= ペナルティ帯のものをランダム選択。
   for (let depth = 1; depth <= maxDepth; depth++) {
     let roundBest = legal[0], roundBestScore = -Infinity;
     let aborted = false;
@@ -128,7 +126,14 @@ export function search(
       if (s > roundBestScore) { roundBestScore = s; roundBest = cell; }
       } catch (e) { if (e instanceof Deadline) { aborted = true; break; } throw e; }
     }
-    if (aborted) break;
+    if (aborted) {
+      // v2.1.6: deadline中断でも「このラウンドで現時点の最善」roundBestが前回より良ければ採用。
+      // 旧: 中断ラウンドを丸ごと破棄し best=legal[0]（最初の合法手）に堕ちる劣化があった。
+      // 遅いCIランナーで名人Lv5が実質バラ打ちになり、強度順序テストがflaky化していた真因。
+      if (reached === 0 && roundBestScore > bestScore) { best = roundBest; bestScore = roundBestScore; reached = 1; }
+      else if (roundBestScore > bestScore && roundBestScore !== -Infinity) { best = roundBest; bestScore = roundBestScore; }
+      break;
+    }
     best = roundBest; bestScore = roundBestScore; reached = depth;
   }
   if (opts.randomness && opts.randomness > 0) {
