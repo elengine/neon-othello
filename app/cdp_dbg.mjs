@@ -1,0 +1,11 @@
+import CDP from 'chrome-remote-interface';
+const client = await CDP({ port: 9222 });
+const { Page, Runtime, Log } = client;
+await Runtime.enable(); await Page.enable(); await Log.enable();
+Log.entryAdded(e => console.log('[console]', e.level, e.text.slice(0, 300)));
+await Page.navigate({ url: 'http://127.0.0.1:4321/?dbg=' + Date.now() });
+await new Promise(r => setTimeout(r, 3000));
+const expr = `JSON.stringify({ver: document.getElementById('app-version')?.textContent, scr: document.querySelector('.screen.active')?.id, scripts: [...document.scripts].map(s=>s.src.split('/').pop())})`;
+const v = await Runtime.evaluate({ expression: expr, returnByValue: true });
+console.log(v.result?.value ?? JSON.stringify(v));
+await client.close();

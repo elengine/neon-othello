@@ -1,6 +1,7 @@
 // ランキング/履歴/プロフィール画面（設計書 S8/S9）
 import { fetchRanking, myRank, fetchHistory, currentProfile, titleFor, type RankRow } from '../supabase/auth';
 import { supabaseConfigured } from '../supabase/client';
+import { aiLevelName } from '../core/ai';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -58,7 +59,7 @@ export async function renderHistory(): Promise<void> {
     const li = document.createElement('li');
     li.className = 'hist-item';
     const d = new Date(g.played_at);
-    const modeTxt = g.mode === 'ai' ? `AI(Lv${g.ai_level ?? '?'})` : g.mode === 'online' ? 'オンライン' : 'ローカル';
+    const modeTxt = g.mode === 'ai' ? (g.ai_level ? `AI ${aiLevelName(g.ai_level)}` : 'AI') : g.mode === 'online' ? 'オンライン' : 'ローカル';
     li.innerHTML = `<span class="hist-date">${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</span>
       <span class="hist-mode">${modeTxt}</span>
       <span class="hist-result r-${g.result}">${g.result === 'win' ? '勝ち' : g.result === 'lose' ? '負け' : '引き分け'}</span>

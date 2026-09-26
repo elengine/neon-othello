@@ -4,7 +4,7 @@ import {
   initialBoard, applyMove, applyPass, gameStatus, stoneCount, winner,
   legalBB, BLACK, WHITE, type Stone,
 } from './core/board';
-import { aiMove } from './core/ai';
+import { aiMove, aiLevelName } from './core/ai';
 import { makeRenderer, NEON_DEFAULT, CLASSIC } from './render/renderer';
 import { PRESETS, prefToTheme, savePref, loadPref, loadImage } from './ui/stonePrefs';
 import gsap from 'gsap';
@@ -546,7 +546,7 @@ function refreshPlayerLabels(): void {
     topLabel!.textContent = 'プレイヤー２';   // 上=白
     bottomLabel!.textContent = 'プレイヤー１'; // 下=黒
   } else {
-    topLabel!.textContent = `AI Lv${state.aiLevel}`;
+    topLabel!.textContent = `AI ${aiLevelName(state.aiLevel)}`;
     bottomLabel!.textContent = myName;
   }
 }
@@ -554,7 +554,7 @@ function refreshPlayerLabels(): void {
 // ---- 対局開始 ----
 function startAI(lv: number): void {
   state.mode = 'ai'; state.aiLevel = lv; state.humanStone = BLACK;
-  $('hud-top').querySelector('span:nth-child(2)')!.textContent = `AI Lv${lv}`;
+  $('hud-top').querySelector('span:nth-child(2)')!.textContent = `AI ${aiLevelName(lv)}`;
   document.body.classList.remove('online-game');
   state.board = initialBoard(); lastMoves = [];
   show('game'); layoutBoard(); drawAll({ legal: true });

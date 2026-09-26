@@ -127,18 +127,20 @@ header, footer {
 /* ===== v2.0.0: ロビーUI刷新 ===== */
 /* ===== v2.0.1: 待機トグルの存在感向上（トグル大型化・ON時ネオン発光） ===== */
 /* v2.0.3: 枠(カード)を廃止し、設定画面と同じトグルスイッチ(左)＋文言のプレーンな行に */
-.wait-row { width: min(560px, 94vw); padding: 12px 4px; }
+/* v2.1.1: ON時のはみ出し修正(overflow:hidden+box-sizing) / ステータスバーとの間隔拡大 */
+.wait-row { width: min(560px, 94vw); padding: 12px 4px; margin-bottom: 18px; }
 .wait-card-text { flex: 1; }
 .wait-card-text b { font-size: 19px; display: block; }
 .wait-row.on .wait-card-text b { color: var(--accent); text-shadow: 0 0 12px #16e0ff88; }
 .wait-card-text small { display: block; font-size: 13px; color: #8fa3c8; margin-top: 3px; line-height: 1.5; }
 #wait-card .sw { width: 74px; height: 42px; }
-#wait-card .sw input { min-width: 74px; min-height: 42px; background: #0c1428; border: 2.5px solid #3a4f7f; }
-#wait-card .sw input::after { top: 4px; left: 4px; width: 30px; height: 30px; }
+#wait-card .sw input { min-width: 74px; min-height: 42px; background: #0c1428; border: 2.5px solid #3a4f7f;
+  box-sizing: border-box; overflow: hidden; }
+#wait-card .sw input::after { box-sizing: border-box; top: 3.5px; left: 3.5px; width: 31px; height: 31px; }
 #wait-card .sw input:checked { background: linear-gradient(95deg,#00d0ff,#7b2bff); border-color: transparent; box-shadow: 0 0 18px rgba(0,220,255,.75); }
-#wait-card .sw input:checked::after { transform: translateX(32px); }
+#wait-card .sw input:checked::after { transform: translateX(31px); }
 .lobby-status { width: min(560px, 94vw); border-radius: 16px; padding: 12px 16px; font-size: 16.5px; font-weight: 700;
-  margin-bottom: 10px; display: flex; gap: 10px; align-items: center; border: 1px solid #2a3f6f; background: #0b1428; color: #7c8fb5; }
+  margin-bottom: 10px; margin-top: 0; display: flex; gap: 10px; align-items: center; border: 1px solid #2a3f6f; background: #0b1428; color: #7c8fb5; }
 .lobby-status.on { background: linear-gradient(95deg,#062c3a,#251042); border-color: var(--stone-black); color: var(--accent); box-shadow: 0 0 14px #16e0ff22; }
 .lobby-status .ico { font-size: 22px; }
 .lobby-status .pulse { width: 13px; height: 13px; border-radius: 50%; background: var(--stone-black); margin-left: auto; flex: none; }
@@ -181,8 +183,8 @@ header, footer {
 .account-info small { font-size: 15px; color: var(--gold); font-weight: 700; }
 .account-on { font-size: 13px; font-weight: 800; color: #062c3a; background: linear-gradient(95deg,#00d0ff,#7bff9c);
   border-radius: 999px; padding: 5px 12px; flex: none; }
-.logout-mini { align-self: center; margin-top: 14px; background: none; border: none; cursor: pointer;
-  font-family: inherit; font-size: 12.5px; color: #46577c; text-decoration: underline; padding: 8px; }
+.logout-mini { align-self: center; order: 9; margin-top: auto; background: none; border: none; cursor: pointer;
+  font-family: inherit; font-size: 12.5px; color: #46577c; text-decoration: underline; padding: 18px 8px 8px; }
 .logout-mini:active { color: #8fa3c8; }
 .rank-sep { text-align: center; color: #56688c; padding: 4px; }
 .hist-item { display: flex; gap: 8px; align-items: center; padding: 7px 10px; border-bottom: 1px solid #16203a; font-size: 12px; }

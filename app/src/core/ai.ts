@@ -153,6 +153,12 @@ export function search(
 
 // ---- レベル定義（設計書 §5 の表） ----
 export interface AIProfile { depth: number; timeBudgetMs: number; randomness: number; blunderChance?: number; }
+/** v2.1.1: AIレベル番号→段位名（UI表記は「AI 見習い」等の名称で表示。選択画面のカード名と一致させる） */
+export const AI_LEVEL_NAMES: Record<number, string> = {
+  1: '見習い', 2: '初段', 3: '三段', 4: '有段', 5: '名人',
+};
+export function aiLevelName(lv: number): string { return AI_LEVEL_NAMES[lv] ?? String(lv); }
+
 export const AI_LEVELS: Record<number, AIProfile> = {
   1: { depth: 1, timeBudgetMs: 300, randomness: 1.5, blunderChance: 0.4 },  // 見習い（v1.7.0 弱化: 40%で完全ランダム手）
   2: { depth: 2, timeBudgetMs: 500, randomness: 0.4, blunderChance: 0.15 }, // 初段（v1.7.0 弱化: 1手読み+15%ポカ）
