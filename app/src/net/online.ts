@@ -204,6 +204,16 @@ async function subscribeMatch(matchId: string, iAmBlack: boolean, opp: Opponent)
   oppLeftNotified = false; byeSent = false;
   if (matchWatch) { clearInterval(matchWatch); matchWatch = null; }
   matchCh = sb.channel('oth-match:' + matchId, { config: { broadcast: { self: false } } });
+  // v2.1.3: DB変更(oth_matches.status→ended/abandoned)をRealtimeで受ける確定経路。
+  // broadcast byeは送信側の離脱順序/Realtime断で届かないことがあるため、status変化側でも必ず相手終了を検知する。
+  matchCh.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'oth_matches', filter: 'id=eq.' + matchId },
+    (msg) => {
+      const st = (msg.new as { status?: string })?.status;
+      if (st === 'ended' || st === 'abandoned') {
+        if (st === 'abandoned') oppLeftNotified = true;
+        CB.onOpponentBye?.();
+      }
+    });
   await matchCh.on('broadcast', { event: 'mv' }, ({ payload }) => {
     const p = payload as { cell: number; seq: number };
     if (p.seq <= lastSeqSent && p.seq !== lastSeqSent + 0) { /* 重複無視 */ }
