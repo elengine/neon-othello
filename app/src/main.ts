@@ -15,6 +15,7 @@ import { sfx, toggleMute, setSound } from './audio/sfx';
 import { renderRanking, renderHistory } from './ui/rankingView';
 import { initOnline, enterLobby, setWaiting, invite, isOnlinePlaying, onlineCB, setInviteHandler, endMatch, sendMove, sendPass, sendResign, sendBye, saveSnapshot, leaveLobby, amWaiting, type Opponent } from './net/online';
 import { encodeMoves } from './core/board';
+import { initPwaUpdate } from './ui/pwaUpdate';
 
 declare const __APP_VERSION__: string | undefined;
 export const APP_VERSION = (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.1.0');
@@ -331,6 +332,7 @@ async function restorePref(): Promise<void> {
 // ---- 起動 ----
 export function boot(): void {
   $('app-version').textContent = 'v' + APP_VERSION;
+  initPwaUpdate();   // v2.0.2: SW更新検知→「タップで更新」バナー＋30分ごと能動チェック
   renderer = makeRenderer($('board') as unknown as HTMLCanvasElement, state.theme);
 
   $('btn-ai').addEventListener('click', () => show('difficulty'));

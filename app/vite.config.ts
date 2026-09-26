@@ -8,7 +8,8 @@ export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.1.0') },
   plugins: [
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',  // v2.0.2: autoUpdate→prompt。旧キャッシュに黙って留まるのをやめ、更新検知は自前バナーで再読込を促す（pwaUpdate.ts）
+      injectRegister: false,   // 登録は main.ts の registerSW(immediate) が唯一の経路（二重登録回避）
       includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
       manifest: {
         name: 'NEON OTHELLO',
