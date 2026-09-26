@@ -59,8 +59,9 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
       ctx.drawImage(icon, -r, -r, r * 2, r * 2);
     }
     ctx.lineWidth = Math.max(1.5, r * 0.1);
-    ctx.strokeStyle = theme.glow + 'aa';
-    ctx.shadowColor = theme.glow; ctx.shadowBlur = r * 0.55;
+    // v2.1.10: 石の枠色は石自身の同系色（旧: 全石共通のglow色で、白石にシアン枠等ズレて見えた）
+    ctx.strokeStyle = shade(col, 0.25) + 'cc';
+    ctx.shadowColor = col; ctx.shadowBlur = r * 0.55;
     ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
@@ -71,6 +72,10 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
     ctx.clearRect(0, 0, size, size);
     // 盤
     ctx.fillStyle = theme.boardBg; roundRect(ctx, 0, 0, size, size, size * 0.03); ctx.fill();
+    // v2.1.10: 台自身の枠線（boardBgを明めた同系色）。背景と盤が近いテーマでも境界が分かる
+    ctx.strokeStyle = shade(theme.boardBg, 0.35); ctx.lineWidth = Math.max(2, size * 0.012);
+    roundRect(ctx, ctx.lineWidth / 2, ctx.lineWidth / 2, size - ctx.lineWidth, size - ctx.lineWidth, size * 0.03);
+    ctx.stroke();
     ctx.strokeStyle = theme.grid; ctx.lineWidth = 1;
     for (let i = 1; i < 8; i++) {
       ctx.beginPath(); ctx.moveTo(i * cell, 4); ctx.lineTo(i * cell, size - 4); ctx.stroke();
