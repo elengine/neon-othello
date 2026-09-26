@@ -13,7 +13,7 @@ import { supabaseConfigured } from './supabase/client';
 import { celebrateLevelUp } from './ui/celebrate';
 import { sfx, toggleMute, setSound } from './audio/sfx';
 import { renderRanking, renderHistory } from './ui/rankingView';
-import { initOnline, enterLobby, setWaiting, invite, isOnlinePlaying, onlineCB, setInviteHandler, endMatch, sendMove, sendPass, sendResign, sendBye, saveSnapshot, leaveLobby, amWaiting, type Opponent } from './net/online';
+import { initOnline, enterLobby, setWaiting, invite, isOnlinePlaying, onlineCB, setInviteHandler, endMatch, sendMove, sendPass, sendResign, sendBye, saveSnapshot, leaveLobby, rebeat, getOnlineState, amWaiting, type Opponent } from './net/online';
 import { encodeMoves } from './core/board';
 import { initPwaUpdate } from './ui/pwaUpdate';
 
@@ -228,6 +228,7 @@ function scheduleAI(): void {
 }
 
 let lastMoves: number[] = [];
+let pendingInviteUid: string | null = null;   // v2.1.2: 招待送信中ボタンをポーリング再描画で「挑戦」に戻さない
 
 async function finishGame(): Promise<void> {
   const w = winner(state.board);
@@ -387,13 +388,15 @@ export function boot(): void {
   };
   onlineCB.onRemoteResign = async () => { stopTurnTimer(); cancelAI(); toast('相手が投了しました'); state.forcedResult = 'win'; state.forcedLabel = '相手が投了しました（あなたの勝ち）'; await endMatch(); finishGame(); };
   // 招待の応答ハンドリング（v1.5.0）: 承諾されるまで招待側はゲーム画面に移行しない
-  onlineCB.onInviteDeclined = (opp) => { toast(`${opp.display_name} が招待を拒否しました`); };
-  onlineCB.onInviteTimeout = (opp) => { toast(`${opp.display_name} から応答がありません`); };
+  onlineCB.onInviteDeclined = (opp) => { pendingInviteUid = null; toast(`${opp.display_name} が招待を拒否しました`); };
+  onlineCB.onInviteTimeout = (opp) => { pendingInviteUid = null; toast(`${opp.display_name} から応答がありません`); };
   // ---- 相手離脱ハンドリング（v1.7.0）----
   // bye（ゲーム終了/タイトル等の明示退出）→ 即時不戦勝。切断は30秒猶予後に不戦勝。
   // 盤面石数で勝敗を計算せず forcedResult を優先し、戦績にも正しく反映する。
   const opponentGone = async (msg: string) => {
     if (state.screen !== 'game' || state.mode !== 'online' || !isOnlinePlaying()) return;
+    // v2.1.2: 自盤面が既に終局なら自然終了としてローカル判定に任せる（bye競合で誤不戦勝を表示しない）
+    if (gameStatus(state.board) === 'over') return;
     stopTurnTimer(); cancelAI();
     state.forcedResult = 'win'; state.forcedLabel = msg;
     toast(msg);
@@ -412,6 +415,8 @@ export function boot(): void {
     }, 1000);
   };
   $('btn-local').addEventListener('click', startLocal);
+  // v2.1.2: フォア復帰時に心跳を即更新 → バックグラウンド凍結で幽霊化した待機行を一覧へ即復帰させる
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) void rebeat(); });
   $('btn-settings').addEventListener('click', () => show('settings'));
   $('btn-ranking').addEventListener('click', () => show('ranking'));
   $('btn-login').addEventListener('click', () => loginWithGoogle());
@@ -434,7 +439,18 @@ export function boot(): void {
     $('result-detail').textContent = '';
     show('result');
   });
-  $('btn-again').addEventListener('click', () => { state.board = initialBoard(); lastMoves = []; show('game'); layoutBoard(); drawAll({ legal: true }); });
+  // v2.1.2: オンライン局後の「もう一度」は旧マッチと切り離された幽局になる（相手が放置される穴）。
+  // 対戦相手の再マッチング（ロビー）へ誘導する。ローカル/AI局のみ同条件リ-match。
+  $('btn-again').addEventListener('click', () => {
+    if (state.mode === 'online' && !isOnlinePlaying()) {
+      toast('もう一度オンライン対戦する場合は相手を探します');
+      if (supabaseConfigured() && currentProfile()) { void enterLobby(renderLobby); show('lobby');
+        const w = ($('chk-wait') as unknown as HTMLInputElement); w.checked = amWaiting; void renderLobby([], null); }
+      else show('title');
+      return;
+    }
+    state.board = initialBoard(); lastMoves = []; show('game'); layoutBoard(); drawAll({ legal: true });
+  });
   $('btn-result-title').addEventListener('click', () => show('title'));
   $('btn-pause').addEventListener('click', () => setPaused(!paused));
   $('btn-resume').addEventListener('click', () => setPaused(false));
@@ -591,6 +607,7 @@ function refreshChrome(): void {
 }
 
 function renderLobby(list: Opponent[], me?: Opponent | null): void {
+  if (pendingInviteUid && getOnlineState() !== 'invited') pendingInviteUid = null; // v2.1.2: 招待決着後は通常表示へ
   const on = Boolean(me);
   const card = $('wait-card');
   card?.classList.toggle('on', on);
@@ -616,8 +633,13 @@ function renderLobby(list: Opponent[], me?: Opponent | null): void {
       const btn = e.target as HTMLButtonElement;
       btn.disabled = true; btn.textContent = '…';
       const st2 = await invite(o);
-      btn.textContent = st2 === 'sent' ? '招待送信中' : 'もう待機していません';
+      if (st2 === 'sent') { pendingInviteUid = o.id; btn.textContent = '応答待ち…'; }
+      else btn.textContent = 'もう待機していません';
     });
+    if (pendingInviteUid === o.id) {
+      const b = li.querySelector('.challenge') as HTMLButtonElement;
+      b.disabled = true; b.textContent = '応答待ち…';   // v2.1.2: ポーリング再描画で「挑戦」に戻さない
+    }
     ul.appendChild(li);
   }
 }

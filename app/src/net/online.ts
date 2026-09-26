@@ -19,8 +19,10 @@ const CB = {
 export const onlineCB = CB;
 
 let matchCh: RealtimeChannel | null = null;
+let matchWatch: ReturnType<typeof setInterval> | null = null;   // v2.1.2: byeブロードキャスト取りこぼし時のDBフォールバック監視
 let oppLeftNotified = false;   // 切断/byeハンドラの多重発火防止
 export let onlineState: 'offline' | 'waiting' | 'invited' | 'playing' = 'offline';
+export function getOnlineState(): typeof onlineState { return onlineState; }
 let myInvitePoll: ReturnType<typeof setInterval> | null = null;
 let currentMatchId: string | null = null;
 let lastSeqSent = 0;
@@ -34,11 +36,20 @@ let lobbyRender: ((list: Opponent[], me: Opponent | null) => void) | null = null
 let lobbyPoll: ReturnType<typeof setInterval> | null = null;
 let lobbyBeat: ReturnType<typeof setInterval> | null = null;
 export let amWaiting = false;
+let byeSent = false;   // v2.1.2: sendBye→unsubscribe の競合防止（endMatch側で重複送信しない）
 
 export async function enterLobby(render: (list: Opponent[], me: Opponent | null) => void): Promise<void> {
   lobbyRender = render;
   if (!lobbyPoll) lobbyPoll = setInterval(() => { void refreshLobby(); }, 1800); // 1.8s間隔でDB照合（即時性と帯域のバランス）
   if (!myInvitePoll) myInvitePoll = setInterval(() => { void checkInvites(); }, 1500);
+  await refreshLobby();
+}
+
+/** v2.1.2: フォア復帰時に心跳を即更新し、一覧に即復帰させる（トグルONと実待機状態の同期窓を縮める） */
+export async function rebeat(): Promise<void> {
+  if (!amWaiting) return;
+  const sb = supabase(); const me = currentProfile(); if (!sb || !me) return;
+  await sb.from('oth_queue').upsert({ user_id: me.id, status: 'waiting', updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
   await refreshLobby();
 }
 
@@ -190,7 +201,8 @@ async function acceptInvite(inviteId: string, opp: Opponent): Promise<void> {
 async function subscribeMatch(matchId: string, iAmBlack: boolean, opp: Opponent): Promise<void> {
   const sb = supabase(); if (!sb) return;
   await setWaiting(false);
-  oppLeftNotified = false;
+  oppLeftNotified = false; byeSent = false;
+  if (matchWatch) { clearInterval(matchWatch); matchWatch = null; }
   matchCh = sb.channel('oth-match:' + matchId, { config: { broadcast: { self: false } } });
   await matchCh.on('broadcast', { event: 'mv' }, ({ payload }) => {
     const p = payload as { cell: number; seq: number };
@@ -208,6 +220,17 @@ async function subscribeMatch(matchId: string, iAmBlack: boolean, opp: Opponent)
       if (s === 'SUBSCRIBED') {
         await matchCh!.track({ uid: currentProfile()?.id });
         CB.onMatchStart?.(iAmBlack, opp, '');
+        // v2.1.2: bye/resignブロードキャストがRealtime断で相手に届かなかった場合の保険。
+        // 5秒ごとにマッチ行のDB status を見て ended/abandoned なら onOpponentBye と同扱いで発火。
+        if (!matchWatch) matchWatch = setInterval(() => {
+          if (onlineState !== 'playing' || !currentMatchId || byeSent) return;
+          void (async () => {
+            const { data } = await sb.from('oth_matches').select('status').eq('id', currentMatchId!).maybeSingle();
+            if (data && (data.status === 'ended' || data.status === 'abandoned')) {
+              oppLeftNotified = true; CB.onOpponentBye?.();
+            }
+          })();
+        }, 5000);
       }
     });
 }
@@ -222,7 +245,7 @@ export function sendMove(cell: number): void {
 export function sendPass(): void { void matchCh?.send({ type: 'broadcast', event: 'pass', payload: {} }); }
 export function sendResign(): void { void matchCh?.send({ type: 'broadcast', event: 'resign', payload: {} }); }
 /** 対局中に「ゲーム終了/再挑戦/タイトルへ」等で離脱する旨を先に伝える（相手は即不戦勝表示できる） */
-export function sendBye(): void { void matchCh?.send({ type: 'broadcast', event: 'bye', payload: {} }); }
+export function sendBye(): void { if (matchCh && !byeSent) { byeSent = true; void matchCh.send({ type: 'broadcast', event: 'bye', payload: {} }); } }
 
 /** 盤面スナップショット（復元・照合用）をDBへ保存 */
 export async function saveSnapshot(movesSvg: string): Promise<void> {
@@ -231,9 +254,13 @@ export async function saveSnapshot(movesSvg: string): Promise<void> {
 }
 export async function endMatch(ended = true): Promise<void> {
   const sb = supabase(); if (!sb || !currentMatchId) return;
+  // v2.1.2: 未終局離脱（abandoned）のみbyeを送る。自然終了は双方が最終手で自局判定済みのためbye不要
+  //（送ると相手のローカル終局判定と競合して誤「不戦勝」になり得る）。送信後フラッシュ待ち→DB更新→unsubscribe。
+  if (!ended && !byeSent && matchCh) { byeSent = true; void matchCh.send({ type: 'broadcast', event: 'bye', payload: {} }); await sleep(80); }
   await sb.rpc('oth_match_update', { p_match: currentMatchId, p_moves: '', p_status: ended ? 'ended' : 'abandoned' });
   await matchCh?.unsubscribe(); matchCh = null; currentMatchId = null;
-  onlineState = 'offline'; lastSeqSent = 0;
+  if (matchWatch) { clearInterval(matchWatch); matchWatch = null; }
+  onlineState = 'offline'; lastSeqSent = 0; byeSent = false;
   await refreshProfile();
 }
 
