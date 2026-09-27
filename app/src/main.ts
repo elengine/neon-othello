@@ -272,7 +272,7 @@ async function finishGame(): Promise<void> {
         opp_user: state.mode === 'online' ? (state.opp?.id ?? null) : null,
       });
       if (r) {
-        badge.textContent = `＋${r.xp_gained} XP（Lv${r.new_level} ${titleFor(r.new_level)}）`;
+        badge.textContent = `＋${r.xp_gained} XP（レベル${r.new_level} ${titleFor(r.new_level)}）`;
         if (r.leveled_to) setTimeout(() => celebrateLevelUp(r.leveled_to!, state.prevLevel, r.xp), 650);
       } else badge.textContent = '（保存失敗: 記録は端末内のみ）';
     } catch (e) {
@@ -350,7 +350,7 @@ export function boot(): void {
     await setWaiting((e.target as HTMLInputElement).checked); // 内部で refreshLobby → 一覧と自分行が即更新される
   });
   setInviteHandler((opp, accept, decline) => {
-    $('invite-text').textContent = `${opp.display_name}（Lv${opp.level}）から対戦招待`;
+    $('invite-text').textContent = `${opp.display_name}（レベル${opp.level}）から対戦招待`;
     playSound('invite');
     $('invite-modal').classList.add('show');
     $('btn-accept').onclick = () => { $('invite-modal').classList.remove('show'); accept(); };
@@ -514,7 +514,7 @@ export function boot(): void {
   soundChk.addEventListener('change', () => {
     Prefs.sound = soundChk.checked;
     savePrefs();
-    setSound(Prefs.sound);   // 音の実体（Howler）へ即反映。HUD絵文字も同调用
+    setSound(Prefs.sound);   // 音の実体（Howler）へ即反映。HUD絵文字も同様のコールで同期
     ($('btn-mute') as HTMLElement).textContent = Prefs.sound ? '🔊' : '🔇';
   });
   loadPrefs();
@@ -560,7 +560,7 @@ function refreshPlayerLabels(): void {
   const bottomLabel = $('hud-me-name');
   const topLabel = $('hud-opp-name');
   if (state.mode === 'online' && state.opp) {
-    topLabel!.textContent = `${state.opp.display_name.slice(0, 12)} Lv${state.opp.level}`;
+    topLabel!.textContent = `${state.opp.display_name.slice(0, 12)} レベル${state.opp.level}`;
     bottomLabel!.textContent = myName;
   } else if (state.aiLevel === 0) {
     topLabel!.textContent = 'プレイヤー２';   // 上=白
@@ -597,7 +597,7 @@ function refreshChrome(): void {
     loginBtn!.classList.add('hidden');
     card!.classList.remove('hidden');
     ( $('account-name') as HTMLElement).textContent = me.display_name;
-    ( $('account-lv') as HTMLElement).textContent = `Lv${me.level} ${titleFor(me.level)}・${me.wins}勝${me.losses}敗`;
+    ( $('account-lv') as HTMLElement).textContent = `レベル${me.level} ${titleFor(me.level)}・${me.wins}勝${me.losses}敗`;
     const ava = $('account-ava') as HTMLImageElement;
     if (me.avatar_url) ava.src = me.avatar_url; else ava.style.visibility = 'hidden';
     logoutBtn!.classList.remove('hidden');   // ログアウトは最下部の地味リンク
@@ -630,7 +630,7 @@ function renderLobby(list: Opponent[], me?: Opponent | null): void {
     const li = document.createElement('li');
     li.className = 'rank-item lobby-row';
     li.innerHTML = `<img class="rank-ava" src="${o.avatar_url ?? ''}" onerror="this.style.visibility='hidden'">
-      <span class="rank-name">${o.display_name}</span><span class="rank-lv">Lv${o.level}</span>
+      <span class="rank-name">${o.display_name}</span><span class="rank-lv">レベル${o.level}</span>
       <span class="rank-num">${o.wins}勝${o.losses}敗</span>
       <button class="btn btn-ghost challenge">挑戦</button>`;
     li.querySelector('.challenge')!.addEventListener('click', async (e) => {

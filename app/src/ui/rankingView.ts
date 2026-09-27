@@ -38,7 +38,7 @@ function rankRow(r: RankRow, pos: number, isMe: boolean): HTMLElement {
   li.innerHTML = `<span class="rank-pos">${pos}</span>
     <img class="rank-ava" src="${escapeAttr(r.avatar_url ?? '')}" alt="" onerror="this.style.visibility='hidden'">
     <span class="rank-name">${escapeHtml(r.display_name)}</span>
-    <span class="rank-lv">Lv${r.level} ${escapeHtml(titleFor(r.level))}</span>
+    <span class="rank-lv">レベル${r.level} ${escapeHtml(titleFor(r.level))}</span>
     <span class="rank-num">${r.wins}勝 ${wr}%</span>`;
   return li;
 }
@@ -51,7 +51,7 @@ export async function renderHistory(): Promise<void> {
   const meBar = $('history-me');
   // v2.1.9: 未ログイン時は戦績バーを空にし、一覧側の「ログインすると…」案内1本だけ表示。
   // 旧: バーと一覧の両方に同文を出して二重表示バグ（実機報告）。
-  meBar.textContent = me ? `Lv${me.level} ${titleFor(me.level)}｜${me.wins}勝${me.losses}敗${me.draws}分（連勝${me.streak}/最長${me.best_streak}）`
+  meBar.textContent = me ? `レベル${me.level} ${titleFor(me.level)}｜${me.wins}勝${me.losses}敗${me.draws}分（連勝${me.streak}/最長${me.best_streak}）`
     : '';
   list.innerHTML = '';
   if (!me) { list.innerHTML = '<li class="rank-loading">ログインすると履歴が見られます</li>'; return; }
