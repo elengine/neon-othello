@@ -116,7 +116,20 @@ function drawAll(opts: { legal?: boolean } = {}): void {
   oppBar?.classList.toggle('turn-side', Boolean(live && !meOn && !state.thinking));
   if (state.thinking) oppBar?.classList.add('turn-side');
   $('think-overlay').classList.toggle('show', state.thinking);
+  // v2.1.12: 自分の番の背景演出 — A:ビネット(番の間点灯) / C:波紋(番が回ってきた瞬間1発)
+  const local2p = state.mode === 'ai' && state.aiLevel === 0;   // 2人対戦は「自分の番」概念がないので対象外
+  const mineNow = live && meOn && !state.thinking && !local2p;
+  const turnCol = state.humanStone === BLACK ? state.theme.black : state.theme.white;
+  const root = document.documentElement.style;
+  root.setProperty('--turn-color', turnCol);
+  root.setProperty('--turn-color-soft', turnCol + '30');   // ビネット外周（実効は端でさらに淡くなる）
+  root.setProperty('--turn-color-dim', turnCol + '1c');    // ビネット内側の滲み
+  $('screen-game').classList.toggle('my-turn', mineNow);
+  const ripple = $('turn-ripple');
+  if (mineNow && !myTurnFx) { myTurnFx = true; ripple.classList.remove('play'); void ripple.offsetWidth; ripple.classList.add('play'); }
+  else if (!mineNow) myTurnFx = false;
 }
+let myTurnFx = false;   // 波紋の再発火管理: 非手番→手番の遷移時にだけ再生
 
 function onBoardTap(ev: PointerEvent): void {
   if (paused || state.screen !== 'game' || state.thinking || gameStatus(state.board) === 'over') return;
