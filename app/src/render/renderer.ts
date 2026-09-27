@@ -25,7 +25,7 @@ export const CLASSIC: StoneTheme = {
 
 export interface Renderer {
   resize(cssSize: number): void;
-  draw(board: Board, opts: { legal?: boolean; last?: boolean; hover?: number | null; flippedCells?: number[]; flipAnim?: number; fromCell?: number; turnGlow?: number; turnColor?: string }): void;
+  draw(board: Board, opts: { legal?: boolean; last?: boolean; hover?: number | null; flippedCells?: number[]; flipAnim?: number; fromCell?: number; turnGlow?: number; lineWidthScale?: number }): void;
   cellAt(clientX: number, clientY: number, rect: DOMRect): number | null;
 }
 
@@ -66,7 +66,7 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
     ctx.restore();
   }
 
-  function draw(board: Board, o: { legal?: boolean; last?: boolean; hover?: number | null; flippedCells?: number[]; flipAnim?: number; fromCell?: number; turnGlow?: number; turnColor?: string }): void {
+  function draw(board: Board, o: { legal?: boolean; last?: boolean; hover?: number | null; flippedCells?: number[]; flipAnim?: number; fromCell?: number; turnGlow?: number; lineWidthScale?: number }): void {
     const cell = size / 8;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size, size);
@@ -76,13 +76,15 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
     ctx.strokeStyle = shade(theme.boardBg, 0.35); ctx.lineWidth = Math.max(2, size * 0.012);
     roundRect(ctx, ctx.lineWidth / 2, ctx.lineWidth / 2, size - ctx.lineWidth, size - ctx.lineWidth, size * 0.03);
     ctx.stroke();
-    // v2.1.15: 自分の番は盤の外枠線を手番石色で発光（strength 0〜1・設定画面のスライダーで調整可）
-    if (o.turnGlow && o.turnGlow > 0 && o.turnColor) {
+    // v2.1.16: 自分の番は盤の外枠線を「元の同系色のまま」明るく光る（石色への変色なし）
+    // 明るさ glow(0〜1)・太さ widthScale(1〜5・5=現状最大)は設定画面スライダーで調整可
+    if (o.turnGlow && o.turnGlow > 0) {
       const g = Math.min(1, o.turnGlow);
+      const tw = Math.min(5, Math.max(1, o.lineWidthScale ?? 5));
       ctx.save();
-      ctx.strokeStyle = o.turnColor + alphaHex(0.35 + 0.65 * g);
-      ctx.lineWidth = Math.max(2, size * (0.012 + 0.006 * g));
-      ctx.shadowColor = o.turnColor; ctx.shadowBlur = size * (0.01 + 0.06 * g);
+      ctx.strokeStyle = shade(theme.boardBg, 0.35 + 0.5 * g) + alphaHex(0.35 + 0.65 * g);
+      ctx.lineWidth = Math.max(1, size * (0.003 + 0.009 * (tw / 5)) * (0.85 + 0.3 * g));
+      ctx.shadowColor = shade(theme.boardBg, 0.45 + 0.4 * g); ctx.shadowBlur = size * (0.01 + 0.06 * g);
       roundRect(ctx, ctx.lineWidth / 2, ctx.lineWidth / 2, size - ctx.lineWidth, size - ctx.lineWidth, size * 0.03);
       ctx.stroke();
       if (g > 0.5) ctx.stroke();  // 強設定では二重がけでコアを太く
