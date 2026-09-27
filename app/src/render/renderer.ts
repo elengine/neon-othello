@@ -25,7 +25,7 @@ export const CLASSIC: StoneTheme = {
 
 export interface Renderer {
   resize(cssSize: number): void;
-  draw(board: Board, opts: { legal?: boolean; last?: boolean; hover?: number | null; flippedCells?: number[]; flipAnim?: number; fromCell?: number }): void;
+  draw(board: Board, opts: { legal?: boolean; last?: boolean; hover?: number | null; flippedCells?: number[]; flipAnim?: number; fromCell?: number; turnGlow?: number; turnColor?: string }): void;
   cellAt(clientX: number, clientY: number, rect: DOMRect): number | null;
 }
 
@@ -66,7 +66,7 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
     ctx.restore();
   }
 
-  function draw(board: Board, o: { legal?: boolean; last?: boolean; hover?: number | null; flippedCells?: number[]; flipAnim?: number; fromCell?: number }): void {
+  function draw(board: Board, o: { legal?: boolean; last?: boolean; hover?: number | null; flippedCells?: number[]; flipAnim?: number; fromCell?: number; turnGlow?: number; turnColor?: string }): void {
     const cell = size / 8;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size, size);
@@ -76,6 +76,18 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
     ctx.strokeStyle = shade(theme.boardBg, 0.35); ctx.lineWidth = Math.max(2, size * 0.012);
     roundRect(ctx, ctx.lineWidth / 2, ctx.lineWidth / 2, size - ctx.lineWidth, size - ctx.lineWidth, size * 0.03);
     ctx.stroke();
+    // v2.1.15: 自分の番は盤の外枠線を手番石色で発光（strength 0〜1・設定画面のスライダーで調整可）
+    if (o.turnGlow && o.turnGlow > 0 && o.turnColor) {
+      const g = Math.min(1, o.turnGlow);
+      ctx.save();
+      ctx.strokeStyle = o.turnColor + alphaHex(0.35 + 0.65 * g);
+      ctx.lineWidth = Math.max(2, size * (0.012 + 0.006 * g));
+      ctx.shadowColor = o.turnColor; ctx.shadowBlur = size * (0.01 + 0.06 * g);
+      roundRect(ctx, ctx.lineWidth / 2, ctx.lineWidth / 2, size - ctx.lineWidth, size - ctx.lineWidth, size * 0.03);
+      ctx.stroke();
+      if (g > 0.5) ctx.stroke();  // 強設定では二重がけでコアを太く
+      ctx.restore();
+    }
     ctx.strokeStyle = theme.grid; ctx.lineWidth = 1;
     for (let i = 1; i < 8; i++) {
       ctx.beginPath(); ctx.moveTo(i * cell, 4); ctx.lineTo(i * cell, size - 4); ctx.stroke();
@@ -157,6 +169,9 @@ function shade(hex: string, amt: number): string {
   g = Math.min(255, Math.max(0, Math.round(g + (amt > 0 ? (255 - g) * amt : g * amt))));
   b = Math.min(255, Math.max(0, Math.round(b + (amt > 0 ? (255 - b) * amt : b * amt))));
   return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+}
+function alphaHex(a: number): string {   // 0〜1 → 16進2桁（#rrggbb接尾用）
+  return Math.round(Math.min(1, Math.max(0, a)) * 255).toString(16).padStart(2, '0');
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
