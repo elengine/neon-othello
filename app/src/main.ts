@@ -44,8 +44,8 @@ type PaceMode = 'normal' | 'slow' | 'fast' | 'jitter';
 const Prefs = {
   pace: 'jitter' as PaceMode,   // デフォルトはゆらぎ
   sound: true,
-  turnGlow: 30,                 // v2.1.16: 自分の番の盤枠線の明るさ 0〜50（step1・設定画面で調整）
-  turnWidth: 5,                 // v2.1.16: 盤枠線の太さ 1〜5（5=現状最大・設定画面で調整）
+  turnGlow: 40,                 // v2.1.16: 自分の番の盤枠線の明るさ 0〜50（step1・設定画面で調整）
+  turnWidth: 2,                 // v2.1.17: 盤枠線の太さ 1〜5（5=現状最大・設定画面で調整）
 };
 const PACE_KEY = 'otv2:prefs';
 function savePrefs(): void { try { localStorage.setItem(PACE_KEY, JSON.stringify({ pace: Prefs.pace, sound: Prefs.sound, turnGlow: Prefs.turnGlow, turnWidth: Prefs.turnWidth })); } catch { /* 非対応環境 */ } }
