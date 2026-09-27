@@ -78,14 +78,21 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
     ctx.stroke();
     // v2.1.16: 自分の番は盤の外枠線を「元の同系色のまま」明るく光る（石色への変色なし）
     // 明るさ glow(0〜1)・太さ widthScale(1〜5・5=現状最大)は設定画面スライダーで調整可
+    // v2.1.18: 枠線帯の発光は「端に置いた石の可視外縁(実測:芯0.448cell+ring半幅0.021cell=盤縁から約0.031cell)」
+    //   より盤の内側へは描かない（バンド内のみ clip('evenodd')）。端石に枠線の明るみが被る見栄えを解消
     if (o.turnGlow && o.turnGlow > 0) {
       const g = Math.min(1, o.turnGlow);
       const tw = Math.min(5, Math.max(1, o.lineWidthScale ?? 5));
+      const bandIn = cell * 0.031 + 0.8;      // 石の可視外縁＋α（実測2.7px+0.8）
       ctx.save();
+      ctx.beginPath();
+      roundRectPath(ctx, 0, 0, size, size, size * 0.03);
+      roundRectPath(ctx, bandIn, bandIn, size - bandIn * 2, size - bandIn * 2, Math.max(1, size * 0.03 - bandIn));
+      ctx.clip('evenodd');
       ctx.strokeStyle = shade(theme.boardBg, 0.35 + 0.5 * g) + alphaHex(0.35 + 0.65 * g);
       ctx.lineWidth = Math.max(1, size * (0.003 + 0.009 * (tw / 5)) * (0.85 + 0.3 * g));
-      ctx.shadowColor = shade(theme.boardBg, 0.45 + 0.4 * g); ctx.shadowBlur = size * (0.01 + 0.06 * g);
-      roundRect(ctx, ctx.lineWidth / 2, ctx.lineWidth / 2, size - ctx.lineWidth, size - ctx.lineWidth, size * 0.03);
+      ctx.shadowColor = shade(theme.boardBg, 0.45 + 0.4 * g); ctx.shadowBlur = Math.min(size * (0.01 + 0.06 * g), bandIn);
+      roundRect(ctx, ctx.lineWidth / 2 + 0.5, ctx.lineWidth / 2 + 0.5, size - ctx.lineWidth - 1, size - ctx.lineWidth - 1, size * 0.03);
       ctx.stroke();
       if (g > 0.5) ctx.stroke();  // 強設定では二重がけでコアを太く
       ctx.restore();
@@ -178,6 +185,10 @@ function alphaHex(a: number): string {   // 0〜1 → 16進2桁（#rrggbb接尾�
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
   ctx.beginPath();
+  roundRectPath(ctx, x, y, w, h, r);
+}
+function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  // beginPath なしで現パスに角丸矩形を追加（clip('evenodd') の穴あけ用）
   ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
   ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
