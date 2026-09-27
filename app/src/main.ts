@@ -44,20 +44,19 @@ type PaceMode = 'normal' | 'slow' | 'fast' | 'jitter';
 const Prefs = {
   pace: 'jitter' as PaceMode,   // デフォルトはゆらぎ
   sound: true,
-  turnGlow: 40,                 // v2.1.16: 自分の番の盤枠線の明るさ 0〜50（step1・設定画面で調整）
-  turnWidth: 2,                 // v2.1.17: 盤枠線の太さ 1〜5（5=現状最大・設定画面で調整）
 };
 const PACE_KEY = 'otv2:prefs';
-function savePrefs(): void { try { localStorage.setItem(PACE_KEY, JSON.stringify({ pace: Prefs.pace, sound: Prefs.sound, turnGlow: Prefs.turnGlow, turnWidth: Prefs.turnWidth })); } catch { /* 非対応環境 */ } }
+function savePrefs(): void { try { localStorage.setItem(PACE_KEY, JSON.stringify({ pace: Prefs.pace, sound: Prefs.sound })); } catch { /* 非対応環境 */ } }
 function loadPrefs(): void {
   try {
     const raw = JSON.parse(localStorage.getItem(PACE_KEY) ?? '{}');
     if (raw.pace) Prefs.pace = raw.pace;
     if (typeof raw.sound === 'boolean') Prefs.sound = raw.sound;
-    if (typeof raw.turnGlow === 'number') Prefs.turnGlow = Math.min(50, Math.max(0, Math.round(raw.turnGlow)));
-    if (typeof raw.turnWidth === 'number') Prefs.turnWidth = Math.min(5, Math.max(1, Math.round(raw.turnWidth)));
   } catch { /* 破損時は既定 */ }
 }
+// v2.1.22: 盤枠線の明るさ・太さはユーザー確定値で固定（設定UIは撤去済み・localStorage値は無視）
+const TURN_GLOW = 36;   // 0〜50
+const TURN_WIDTH = 4;   // 1〜5
 
 let renderer: ReturnType<typeof makeRenderer>;
 let paused = false;
@@ -97,7 +96,7 @@ function drawAll(opts: { legal?: boolean } = {}): void {
   // マーカーは「実際に打てる手番」の合法手のみ描く（v1.8.0: 相手足の合法手漏れ・パス後の不整合対策）
   const showLegal = opts.legal && gameStatus(state.board) === 'playing' && !state.thinking &&
     (state.mode !== 'online' || state.board.turn === state.humanStone);
-  // v2.1.16: 自分の番の盤枠線発光（明るさ=Prefs.turnGlow 0〜50・太さ=Prefs.turnWidth 1〜5・色は盤の同系色のまま）。2人対戦は対象外
+  // v2.1.16: 自分の番の盤枠線発光（v2.1.22: 値はTURN_GLOW/TURN_WIDTH固定・設定UI撤去済み）。2人対戦は対象外
   const glowOn = gameStatus(state.board) !== 'over' && state.board.turn === state.humanStone && !state.thinking
     && !(state.mode === 'ai' && state.aiLevel === 0);
   renderer.draw(state.board, {
@@ -105,8 +104,8 @@ function drawAll(opts: { legal?: boolean } = {}): void {
     last: true,
     flippedCells: state.pendingFlip.cells,
     flipAnim: state.pendingFlip.cells.length ? state.pendingFlip.anim : undefined,
-    turnGlow: glowOn ? Prefs.turnGlow / 50 : 0,
-    lineWidthScale: Prefs.turnWidth,
+    turnGlow: glowOn ? TURN_GLOW / 50 : 0,
+    lineWidthScale: TURN_WIDTH,
   });
   const { black, white } = stoneCount(state.board);
   // 石数は対局が終わるまで非表示（ご指示: 終了時までわからないように）
@@ -536,29 +535,11 @@ export function boot(): void {
     ($('btn-mute') as HTMLElement).textContent = Prefs.sound ? '🔊' : '🔇';
   });
 
-  // 自分の番の盤枠線：明るさ・太さスライダー（v2.1.16・値表示と永続、盘中なら即再描画）
-  const glowRange = $('rng-turnglow') as unknown as HTMLInputElement;
-  const glowVal = $('turnglow-val');
-  const widthRange = $('rng-turnwidth') as unknown as HTMLInputElement;
-  const widthVal = $('turnwidth-val');
-  const paintGlow = () => { glowVal.textContent = String(Prefs.turnGlow); glowRange.value = String(Prefs.turnGlow); };
-  const paintWidth = () => { widthVal.textContent = String(Prefs.turnWidth); widthRange.value = String(Prefs.turnWidth); };
-  glowRange.addEventListener('input', () => {
-    Prefs.turnGlow = Math.min(50, Math.max(0, Number(glowRange.value)));
-    savePrefs(); paintGlow();
-    if (state.screen === 'game') drawAll({ legal: true });
-  });
-  widthRange.addEventListener('input', () => {
-    Prefs.turnWidth = Math.min(5, Math.max(1, Number(widthRange.value)));
-    savePrefs(); paintWidth();
-    if (state.screen === 'game') drawAll({ legal: true });
-  });
+  // v2.1.22: 盤枠線の明るさ・太さスライダーは撤去（値はTURN_GLOW/TURN_WIDTHで固定）
 
   loadPrefs();
   paintPace();
   soundChk.checked = Prefs.sound;
-  paintGlow();
-  paintWidth();
 
   setSound(Prefs.sound);   // 初期化時: 端末保存値を音の実体へ
   ($('btn-mute') as HTMLElement).textContent = Prefs.sound ? '🔊' : '🔇';
