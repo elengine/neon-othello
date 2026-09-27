@@ -31,13 +31,15 @@ export interface Renderer {
 
 export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Renderer {
   const ctx = canvas.getContext('2d')!;
-  let size = 0, dpr = 1;
+  let size = 0, dpr = 1, pad = 0;   // pad = 枠帯描画用の盤外マージン（v2.1.20: 枠線はすべて盤の外側に置く）
 
   function resize(cssSize: number): void {
     dpr = Math.min(window.devicePixelRatio || 1, 2.5);
     size = Math.max(120, Math.floor(cssSize));
-    canvas.width = size * dpr; canvas.height = size * dpr;
-    canvas.style.width = size + 'px'; canvas.style.height = size + 'px';
+    // 枠線(shadow含む)が盤の外側に完全に収まるマージン。blur最大=glow1.0時 size*0.07 + 枠半幅 + 余白
+    pad = Math.ceil(size * 0.07 + Math.max(2, size * 0.012) / 2 + 3);
+    canvas.width = (size + pad * 2) * dpr; canvas.height = (size + pad * 2) * dpr;
+    canvas.style.width = (size + pad * 2) + 'px'; canvas.style.height = (size + pad * 2) + 'px';
   }
 
   function drawStone(x: number, y: number, r: number, s: Stone, anim: number, icon?: HTMLImageElement | null): void {
@@ -68,24 +70,30 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
 
   function draw(board: Board, o: { legal?: boolean; last?: boolean; hover?: number | null; flippedCells?: number[]; flipAnim?: number; fromCell?: number; turnGlow?: number; lineWidthScale?: number }): void {
     const cell = size / 8;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, size, size);
+    ctx.setTransform(dpr, 0, 0, dpr, pad * dpr, pad * dpr);   // v2.1.20: 盤本体を pad だけ内側へオフセット（枠帯は盤外へ）
+    ctx.clearRect(-pad, -pad, size + pad * 2, size + pad * 2);
     // 盤
     ctx.fillStyle = theme.boardBg; roundRect(ctx, 0, 0, size, size, size * 0.03); ctx.fill();
     // v2.1.10: 台自身の枠線（boardBgを明めた同系色）。背景と盤が近いテーマでも境界が分かる
-    ctx.strokeStyle = shade(theme.boardBg, 0.35); ctx.lineWidth = Math.max(2, size * 0.012);
-    roundRect(ctx, ctx.lineWidth / 2, ctx.lineWidth / 2, size - ctx.lineWidth, size - ctx.lineWidth, size * 0.03);
-    ctx.stroke();
+    // v2.1.20: 枠線は盤の「外側」に置く — パスを盤端の外側半分(=pad内)に配置し、盤面内側へは一切掛からない
+    {
+      const bw = Math.max(2, size * 0.012);
+      ctx.strokeStyle = shade(theme.boardBg, 0.35); ctx.lineWidth = bw;
+      roundRect(ctx, -bw / 2, -bw / 2, size + bw, size + bw, size * 0.03 + bw / 2);
+      ctx.stroke();
+    }
     // v2.1.16: 自分の番は盤の外枠線を「元の同系色のまま」明るく光る（石色への変色なし）
     // 明るさ glow(0〜1)・太さ widthScale(1〜5・5=現状最大)は設定画面スライダーで調整可
+    // v2.1.20: 発光も盤外側帯パスに置換 — shadowBlurの内側滲みは盤面に触れない (pad が収める)
     if (o.turnGlow && o.turnGlow > 0) {
       const g = Math.min(1, o.turnGlow);
       const tw = Math.min(5, Math.max(1, o.lineWidthScale ?? 5));
       ctx.save();
+      const bw = Math.max(1, size * (0.003 + 0.009 * (tw / 5)) * (0.85 + 0.3 * g));
       ctx.strokeStyle = shade(theme.boardBg, 0.35 + 0.5 * g) + alphaHex(0.35 + 0.65 * g);
-      ctx.lineWidth = Math.max(1, size * (0.003 + 0.009 * (tw / 5)) * (0.85 + 0.3 * g));
+      ctx.lineWidth = bw;
       ctx.shadowColor = shade(theme.boardBg, 0.45 + 0.4 * g); ctx.shadowBlur = size * (0.01 + 0.06 * g);
-      roundRect(ctx, ctx.lineWidth / 2, ctx.lineWidth / 2, size - ctx.lineWidth, size - ctx.lineWidth, size * 0.03);
+      roundRect(ctx, -bw / 2, -bw / 2, size + bw, size + bw, size * 0.03 + bw / 2);
       ctx.stroke();
       if (g > 0.5) ctx.stroke();  // 強設定では二重がけでコアを太く
       ctx.restore();
@@ -155,8 +163,9 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
   }
 
   function cellAt(clientX: number, clientY: number, rect: DOMRect): number | null {
-    const x = Math.floor((clientX - rect.left) / (rect.width / 8));
-    const y = Math.floor((clientY - rect.top) / (rect.height / 8));
+    // v2.1.20: canvasは pad の枠帯マージンを持つため、盤本体は rect の内側 pad から始まる
+    const x = Math.floor((clientX - rect.left - pad) / ((rect.width - pad * 2) / 8));
+    const y = Math.floor((clientY - rect.top - pad) / ((rect.height - pad * 2) / 8));
     if (x < 0 || x > 7 || y < 0 || y > 7) return null;
     return idx(y, x);
   }
