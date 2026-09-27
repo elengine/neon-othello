@@ -35,11 +35,13 @@ export function makeRenderer(canvas: HTMLCanvasElement, theme: StoneTheme): Rend
 
   function resize(cssSize: number): void {
     dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    size = Math.max(120, Math.floor(cssSize));
-    // 枠線(shadow含む)が盤の外側に完全に収まるマージン。blur最大=glow1.0時 size*0.07 + 枠半幅 + 余白
-    pad = Math.ceil(size * 0.07 + Math.max(2, size * 0.012) / 2 + 3);
-    canvas.width = (size + pad * 2) * dpr; canvas.height = (size + pad * 2) * dpr;
-    canvas.style.width = (size + pad * 2) + 'px'; canvas.style.height = (size + pad * 2) + 'px';
+    // v2.1.21: cssSize は「canvas全体のCSSサイズ」(=layoutBoardから渡される stage 収まりの寸法)。
+    // 盤本体 size + 枠帯 pad*2 を canvas 内に完全に収め、画面からのはみ出しを防ぐ
+    const total = Math.max(120, Math.floor(cssSize));
+    pad = Math.ceil(total * 0.056 + 4);           // ≒ blur実効(約0.056size)+余白
+    size = total - pad * 2;                       // 盤本体
+    canvas.width = total * dpr; canvas.height = total * dpr;
+    canvas.style.width = total + 'px'; canvas.style.height = total + 'px';
   }
 
   function drawStone(x: number, y: number, r: number, s: Stone, anim: number, icon?: HTMLImageElement | null): void {
